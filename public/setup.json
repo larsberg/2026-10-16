@@ -137,6 +137,7 @@
     "initialDiamondDualEnabled": true,
     "triangulateEnabled": true,
     "faceCenterDualEnabled": true,
+    "averageVerticesEnabled": true,
     "insetEnabled": true,
     "extrusionEnabled": true,
     "excludeInitialBorderTriangles": true,

@@ -238,6 +238,25 @@ export function extrudeFaces(mesh, ids, transform = extrusionTransform(), { segm
   return { mesh: compact(result), faceIds };
 }
 
+// One simultaneous neighbor-average update. Only actual polygon edges define
+// neighbors; boundary vertices keep their original XYZ positions exactly.
+export function averageVertices(mesh, ids) {
+  const { edges, outgoing } = halfEdges(mesh);
+  outgoing.filter(list => list.length).forEach(vertexRing);
+  const faceIds = selectedFaceIds(mesh, ids), neighbors = mesh.vertices.map(() => new Set()), boundary = new Set();
+  for (const h of edges.values()) {
+    neighbors[h.a].add(h.b); neighbors[h.b].add(h.a);
+    if (!h.twin) { boundary.add(h.a); boundary.add(h.b); }
+  }
+  const result = copyMesh(mesh);
+  result.vertices = mesh.vertices.map((position, id) => {
+    if (boundary.has(id) || !neighbors[id].size) return [...position];
+    return [...neighbors[id]].reduce((sum, neighbor) => sum.add(point(mesh, neighbor)), new Vector3()).divideScalar(neighbors[id].size).toArray();
+  });
+  validatePolygonMesh(result);
+  return { mesh: result, faceIds };
+}
+
 // Catmull–Clark over the whole surface. IDs track selected source faces rather
 // than restricting subdivision, so adjacent faces always share refined edges.
 // Boundary vertices stay fixed; boundary edge points are exact midpoints.

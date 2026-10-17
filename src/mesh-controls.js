@@ -46,7 +46,7 @@ export function meshControlsMarkup() {
             <p class="control-heading">Viewport grid</p>${fields('mesh')}
             <p class="camera-hint">The short side uses this many divisions. The long side rounds to the nearest whole number of cells to keep them close to square. Resizing regenerates the mesh.</p>
             <details class="material-group" open><summary>Operation layers</summary>
-              <p class="camera-hint">Toggle each pass below; enabled passes run in numbered order. Border triangles preserve the original outline. Their descendants can be excluded from inset and extrusion, including dual cells that share them. Smoothing keeps the boundary fixed. The final dual replaces all faces and clears selection.</p>
+              <p class="camera-hint">Toggle each pass below; enabled passes run in numbered order. Average vertices runs after the face-center dual and before inset, using connected neighbors while keeping boundary vertices fixed. Border descendants can be excluded from inset and extrusion. Smoothing also keeps the boundary fixed. The final dual clears selection.</p>
               ${meshFields.pipeline.filter(([key]) => key !== 'seed').map(field => fieldMarkup('pipeline', field)).join('')}
               <div class="camera-controls">${fieldMarkup('pipeline', meshFields.pipeline.find(([key]) => key === 'seed'))}</div>
               <button type="button" data-mesh-action="randomize">New variation</button>

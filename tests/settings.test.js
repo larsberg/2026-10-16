@@ -19,7 +19,7 @@ test('local Save/Reload roundtrips mesh settings and rejects invalid writes atom
     return res;
   }
   try {
-    const setup=mergeMeshSetup(defaultMeshSetup(),{mesh:{shortSideSubdivisions:7},pipeline:{seed:42,insetScale:.75,minDepth:1.5,maxDepth:2.5,segments:3,triangulateEnabled:false,faceCenterDualEnabled:false,insetEnabled:false,extrusionEnabled:false,excludeInitialBorderTriangles:false},editing:{selectedOnly:true},extrusion:{depth:1.2,rotateZ:35,scaleX:.7,scaleY:.9},appearance:{wireframeColor:'#aabbcc'},camera:{yaw:30},audio:{bpm:128}});
+    const setup=mergeMeshSetup(defaultMeshSetup(),{mesh:{shortSideSubdivisions:7},pipeline:{seed:42,insetScale:.75,minDepth:1.5,maxDepth:2.5,segments:3,triangulateEnabled:false,faceCenterDualEnabled:false,averageVerticesEnabled:false,insetEnabled:false,extrusionEnabled:false,excludeInitialBorderTriangles:false},editing:{selectedOnly:true},extrusion:{depth:1.2,rotateZ:35,scaleX:.7,scaleY:.9},appearance:{wireframeColor:'#aabbcc'},camera:{yaw:30},audio:{bpm:128}});
     assert.equal((await request('PUT',setup)).statusCode,200);
     assert.deepEqual((await request('GET')).body,setup);
     assert.equal((await request('PUT',{...setup,mesh:{shortSideSubdivisions:2.5}})).statusCode,400);

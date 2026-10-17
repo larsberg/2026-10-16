@@ -1,4 +1,4 @@
-import { dualDiamond, dualNSided, extrudeFaces, extrusionTransform, insetFaces, subdivideSmooth, triangulateFaces } from './mesh-operations.js';
+import { averageVertices, dualDiamond, dualNSided, extrudeFaces, extrusionTransform, insetFaces, subdivideSmooth, triangulateFaces } from './mesh-operations.js';
 
 export function createSeededRandom(seed) {
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) throw new Error('Random seed must be an unsigned 32-bit integer.');
@@ -12,7 +12,7 @@ export function createSeededRandom(seed) {
 }
 
 export function createMeshLayers(base, { enabled = true, seed = 1, insetScale = 0.5, minDepth = 1, maxDepth = 3, segments = 3,
-  initialDiamondDualEnabled = true, triangulateEnabled = true, faceCenterDualEnabled = true, insetEnabled = true, extrusionEnabled = true,
+  initialDiamondDualEnabled = true, triangulateEnabled = true, faceCenterDualEnabled = true, averageVerticesEnabled = true, insetEnabled = true, extrusionEnabled = true,
   subdivisionEnabled = true, subdivisionIterations = 1, diamondDualEnabled = true, excludeInitialBorderTriangles = true } = {}) {
   if (!enabled) return { mesh: base, faceIds: [], stages: [], depths: [] };
   if (!Number.isFinite(insetScale) || insetScale <= 0 || insetScale >= 1) throw new Error('Inset scale must be between 0 and 1.');
@@ -32,7 +32,8 @@ export function createMeshLayers(base, { enabled = true, seed = 1, insetScale = 
   // source belongs to an original border triangle, preserving a connected rim.
   const protectedFaces = faceCenterDualEnabled ? new Set(dual.faceSources.flatMap((sources, id) => sources.some(source => triangleBorder.has(source)) ? [id] : [])) : triangleBorder;
   const targets = dual.mesh.faces.flatMap((_, id) => protectedFaces.has(id) ? [] : [id]);
-  const inset = insetEnabled ? record('Inset caps', insetFaces(dual.mesh, targets, insetScale)) : { mesh: dual.mesh, faceIds: targets };
+  const averaged = averageVerticesEnabled ? record('Average vertices · fixed boundary', averageVertices(dual.mesh, targets)) : { mesh: dual.mesh, faceIds: targets };
+  const inset = insetEnabled ? record('Inset caps', insetFaces(averaged.mesh, averaged.faceIds, insetScale)) : averaged;
   // Separate streams keep depth sampling independent of triangulation's draws.
   const randomDepth = createSeededRandom((seed ^ 0x9e3779b9) >>> 0), samples = [];
   const raised = extrusionEnabled ? record('Random segmented extrusion', extrudeFaces(inset.mesh, inset.faceIds, (id) => {

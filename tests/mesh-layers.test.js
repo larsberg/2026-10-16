@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { PerspectiveCamera, Scene, Vector3 } from 'three';
 import { createViewportMesh, polygonEdges } from '../src/polygon-mesh.js';
 import { createMeshLayers, createSeededRandom } from '../src/mesh-layers.js';
-import { dualDiamond, extrudeFaces, extrusionTransform, dualNSided, faceFrame, triangulateFace, triangulateFaces, validatePolygonMesh } from '../src/mesh-operations.js';
+import { averageVertices, dualDiamond, extrudeFaces, extrusionTransform, dualNSided, faceFrame, triangulateFace, triangulateFaces, validatePolygonMesh } from '../src/mesh-operations.js';
 import { createMeshView } from '../src/mesh-view.js';
 import { defaultMeshSetup, mergeMeshSetup, validateMeshSetup } from '../src/mesh-settings.js';
 
@@ -69,7 +69,7 @@ test('three-segment extrusion creates equal-depth rings and selects only the fin
 test('layer order insets every dual face to 0.5, raises it 1–3 units, and retains every cap selection before smoothing',()=>{
   const base=createViewportMesh(10,8,4),before=structuredClone(base),seed=7;
   const dual=dualNSided(triangulateFaces(base,undefined,{random:createSeededRandom(seed)}).mesh).mesh;
-  const result=createMeshLayers(base,{seed,subdivisionEnabled:false,initialDiamondDualEnabled:false,diamondDualEnabled:false});
+  const result=createMeshLayers(base,{seed,subdivisionEnabled:false,initialDiamondDualEnabled:false,diamondDualEnabled:false,averageVerticesEnabled:false});
   assert.deepEqual(result.stages.map(s=>s.name),['Random triangulate','Face-center dual','Inset caps','Random segmented extrusion']);
   assert.equal(result.stages[0].faces,base.faces.length*2);
   assert.equal(result.stages[1].faces,base.vertices.length);
@@ -87,8 +87,8 @@ test('layer order insets every dual face to 0.5, raises it 1–3 units, and reta
     }
   }
   assert.ok(new Set(result.depths.map(item=>item.depth)).size>1);
-  assert.deepEqual(result,createMeshLayers(base,{seed,subdivisionEnabled:false,initialDiamondDualEnabled:false,diamondDualEnabled:false}));
-  assert.notDeepEqual(result.depths,createMeshLayers(base,{seed:8,subdivisionEnabled:false,initialDiamondDualEnabled:false,diamondDualEnabled:false}).depths);
+  assert.deepEqual(result,createMeshLayers(base,{seed,subdivisionEnabled:false,initialDiamondDualEnabled:false,diamondDualEnabled:false,averageVerticesEnabled:false}));
+  assert.notDeepEqual(result.depths,createMeshLayers(base,{seed:8,subdivisionEnabled:false,initialDiamondDualEnabled:false,diamondDualEnabled:false,averageVerticesEnabled:false}).depths);
   assert.deepEqual(base,before);manifold(result.mesh);
 });
 
@@ -103,12 +103,13 @@ test('resize rebuilds the final diamond dual and clears manual edit history and 
   const view=createMeshView(new Scene()),camera=new PerspectiveCamera(42,1,.1,1000),settings=defaultMeshSetup();
   camera.position.set(0,0,7);camera.lookAt(0,0,0);camera.updateMatrixWorld();
   view.regenerate(camera,settings);const original=structuredClone(view.topology),selection=view.selectedFaces;
-  assert.equal(view.layers.stages.length,7);assert.equal(selection.length,0);
+  assert.equal(view.layers.stages.length,8);assert.equal(selection.length,0);
   assert.equal(view.layers.stages.at(-1).name,'Diamond dual');
   view.extrude([0],extrusionTransform({depth:.2}));assert.equal(view.canUndo,true);
   view.regenerate(camera,settings);assert.equal(view.canUndo,false);assert.deepEqual(view.topology,original);assert.deepEqual(view.selectedFaces,selection);
   camera.aspect=.6;camera.updateProjectionMatrix();view.regenerate(camera,settings);
-  assert.ok(view.layers.stages[4].selected>0);assert.ok(view.layers.stages[4].selected<view.layers.stages[2].faces);
+  const raised=view.layers.stages.find(stage=>stage.name==='Random segmented extrusion'),dual=view.layers.stages.find(stage=>stage.name==='Face-center dual');
+  assert.ok(raised.selected>0);assert.ok(raised.selected<dual.faces);
   assert.equal(view.selectedFaces.length,0);assert.ok(view.topology.vertices.flat().every(Number.isFinite));
   view.dispose();
 });
@@ -119,10 +120,12 @@ test('layer controls roundtrip, validate depth bounds, and migrate old saves',()
   const previous=structuredClone(defaults);delete previous.pipeline.subdivisionEnabled;delete previous.pipeline.subdivisionIterations;delete previous.pipeline.diamondDualEnabled;delete previous.pipeline.initialDiamondDualEnabled;
   for(const key of ['triangulateEnabled','faceCenterDualEnabled','insetEnabled','extrusionEnabled'])delete previous.pipeline[key];
   delete previous.pipeline.excludeInitialBorderTriangles;
+  delete previous.pipeline.averageVerticesEnabled;
   assert.deepEqual(validateMeshSetup(previous).pipeline,defaults.pipeline);
   assert.equal(defaults.pipeline.diamondDualEnabled,true);
   assert.equal(defaults.pipeline.initialDiamondDualEnabled,true);
   assert.equal(defaults.pipeline.excludeInitialBorderTriangles,true);
+  assert.equal(defaults.pipeline.averageVerticesEnabled,true);
   assert.equal(defaults.pipeline.insetScale,.5);assert.equal(defaults.pipeline.subdivisionEnabled,true);assert.equal(defaults.pipeline.subdivisionIterations,1);
   const saved=mergeMeshSetup(defaults,{pipeline:{seed:123,insetScale:.75,minDepth:1,maxDepth:3,segments:3}});
   assert.deepEqual(validateMeshSetup(saved),saved);
@@ -168,7 +171,7 @@ test('initial diamond dual keeps border triangles and original corners before th
   }
 });
 
-const passKeys=['initialDiamondDualEnabled','triangulateEnabled','faceCenterDualEnabled','insetEnabled','extrusionEnabled','subdivisionEnabled','diamondDualEnabled'];
+const passKeys=['initialDiamondDualEnabled','triangulateEnabled','faceCenterDualEnabled','averageVerticesEnabled','insetEnabled','extrusionEnabled','subdivisionEnabled','diamondDualEnabled'];
 function rectangularBoundary(mesh,width,height) {
   const edges=new Map();
   for(const face of mesh.faces)face.forEach((a,i)=>{const b=face[(i+1)%face.length],key=a<b?`${a}:${b}`:`${b}:${a}`,list=edges.get(key)??[];list.push([a,b]);edges.set(key,list);});
@@ -184,7 +187,7 @@ function rectangularBoundary(mesh,width,height) {
 
 test('every pass toggles independently while keeping the entire original boundary',()=>{
   const base=createViewportMesh(4,4,2);
-  for(let mask=0;mask<128;mask++) {
+  for(let mask=0;mask<2**passKeys.length;mask++) {
     const options=Object.fromEntries(passKeys.map((key,i)=>[key,!!(mask&(1<<i))]));
     const result=createMeshLayers(base,{seed:7,...options});
     assert.equal(result.stages.length,passKeys.filter(key=>options[key]).length,JSON.stringify(options));
@@ -212,7 +215,7 @@ test('original diamond border triangles and their dual cells are kept out of ins
   const polygonPositions=(mesh,face)=>face.map(id=>mesh.vertices[id]);
   for(const triangulateEnabled of [false,true])for(const faceCenterDualEnabled of [false,true])for(const insetEnabled of [false,true]) {
     const source=triangulateEnabled?triangulateFaces(initial,undefined,{random:createSeededRandom(7)}).mesh:initial;
-    const working=faceCenterDualEnabled?dualNSided(source).mesh:source;
+    const working=averageVertices(faceCenterDualEnabled?dualNSided(source).mesh:source).mesh;
     // A dual cell belongs to its original vertex. Any vertex in a border
     // triangle produces a cell sharing that triangle, even if the cell is an n-gon.
     const protectedIds=faceCenterDualEnabled?[...borderVertices]:working.faces.flatMap((face,id)=>triangleKeys.has([...face].sort((a,b)=>a-b).join(':'))?[id]:[]);
