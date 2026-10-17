@@ -1,0 +1,44 @@
+/* Give top-level touch browsers a real scroll gesture for retracting their
+   toolbar. The scene stays pinned and follows the dynamic viewport height.
+   Desktop and embedded sketches retain their existing viewport behavior. */
+@media (pointer: coarse) {
+  html[data-mobile-canvas] {
+    height: auto;
+    min-height: 100%;
+    overflow-x: clip;
+    overflow-y: auto;
+  }
+  html[data-mobile-canvas] body {
+    height: auto;
+    min-height: calc(100vh + 160px);
+    min-height: calc(100lvh + 160px);
+    overflow: visible;
+  }
+  html[data-mobile-canvas] #sketch-root {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    height: 100dvh;
+    overflow: clip;
+  }
+  html[data-mobile-canvas] .sketch {
+    height: 100%;
+  }
+  /* OrbitControls sets touch-action:none inline. Let the browser own the
+     opening vertical swipe, then return subsequent gestures to the canvas.
+     The browser keeps ownership of a scroll gesture already in progress. */
+  html[data-mobile-canvas]:not([data-canvas-interactive]) .scene-canvas {
+    touch-action: pan-y !important;
+  }
+  html[data-mobile-canvas] .control-panel {
+    padding-top: env(safe-area-inset-top);
+    padding-right: env(safe-area-inset-right);
+  }
+  html[data-mobile-canvas] .drawer-toggle {
+    top: max(24px, env(safe-area-inset-top));
+    right: max(24px, env(safe-area-inset-right));
+  }
+  html[data-mobile-canvas] .drawer-content {
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+}

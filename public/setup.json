@@ -1,0 +1,283 @@
+{
+  "version": 1,
+  "sketch": "2026-10-16",
+  "materials": {
+    "text": {
+      "metalness": 0,
+      "roughness": 1,
+      "emissiveIntensity": 0,
+      "envMapIntensity": 0,
+      "opacity": 1,
+      "color": "#000000",
+      "emissive": "#ffffff",
+      "wireframe": false,
+      "flatShading": false
+    }
+  },
+  "lighting": {
+    "directional": {
+      "enabled": true,
+      "color": "#ffd5bc",
+      "intensity": 2.6,
+      "offsetX": -3,
+      "height": 7,
+      "offsetZ": 4,
+      "castShadow": true,
+      "softness": 3,
+      "shadowBias": -0.0003,
+      "normalBias": 0.025
+    },
+    "hemisphere": {
+      "enabled": true,
+      "skyColor": "#8bc7ff",
+      "groundColor": "#51303b",
+      "intensity": 0.7,
+      "yaw": 0,
+      "tilt": 0
+    },
+    "environment": {
+      "enabled": true,
+      "intensity": 1,
+      "rotation": 0,
+      "backgroundColor": "#000000",
+      "keyColor": "#ffad83",
+      "stripColor": "#fff1df",
+      "fillColor": "#147aff",
+      "rimColor": "#5ed5ff",
+      "accentColor": "#d997aa",
+      "bounceColor": "#ffac8c",
+      "backColor": "#a99cb7"
+    },
+    "occlusion": {
+      "enabled": false,
+      "intensity": 1.5,
+      "radius": 0.8,
+      "aoOnly": false
+    }
+  },
+  "info": {
+    "upperLeft": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "heading",
+          "attrs": {
+            "textAlign": "left",
+            "level": 1
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "2026-10-16"
+            }
+          ]
+        }
+      ]
+    },
+    "upperRight": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "attrs": {
+            "textAlign": "right"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Mesh generation / n-sided faces."
+            }
+          ]
+        }
+      ]
+    },
+    "lowerLeft": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "attrs": {
+            "textAlign": "left"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Viewport grid / wireframe."
+            }
+          ]
+        }
+      ]
+    },
+    "lowerRight": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "attrs": {
+            "textAlign": "right"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Lars Berg / 2026-10-16"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "mesh": {
+    "shortSideSubdivisions": 4
+  },
+  "editing": {
+    "selectedOnly": true
+  },
+  "pipeline": {
+    "enabled": true,
+    "initialDiamondDualEnabled": true,
+    "triangulateEnabled": true,
+    "faceCenterDualEnabled": true,
+    "insetEnabled": true,
+    "extrusionEnabled": true,
+    "excludeInitialBorderTriangles": true,
+    "seed": 1,
+    "insetScale": 0.5,
+    "minDepth": 1,
+    "maxDepth": 3,
+    "segments": 3,
+    "subdivisionEnabled": true,
+    "subdivisionIterations": 1,
+    "diamondDualEnabled": true
+  },
+  "extrusion": {
+    "offsetX": 0,
+    "offsetY": 0,
+    "depth": 0.5,
+    "rotateX": 0,
+    "rotateY": 0,
+    "rotateZ": 0,
+    "scaleX": 1,
+    "scaleY": 1
+  },
+  "audio": {
+    "enabled": false,
+    "bpm": 100,
+    "volume": 0.55,
+    "drums": 0.8,
+    "bass": 0.6,
+    "keys": 0.7,
+    "melody": 0.65,
+    "instruments": {
+      "kick": {
+        "sound": "original",
+        "level": 1,
+        "decay": 1,
+        "cutoff": 20000,
+        "resonance": 0.45,
+        "drive": 0,
+        "reverb": 0,
+        "delay": 0,
+        "delayBeats": 0.5,
+        "feedback": 0.3
+      },
+      "snare": {
+        "sound": "original",
+        "level": 1,
+        "decay": 1,
+        "cutoff": 20000,
+        "resonance": 0.45,
+        "drive": 0,
+        "reverb": 0,
+        "delay": 0,
+        "delayBeats": 0.5,
+        "feedback": 0.3
+      },
+      "hat": {
+        "sound": "original",
+        "level": 1,
+        "decay": 1,
+        "cutoff": 20000,
+        "resonance": 0.45,
+        "drive": 0,
+        "reverb": 0,
+        "delay": 0,
+        "delayBeats": 0.5,
+        "feedback": 0.3
+      },
+      "bass": {
+        "sound": "original",
+        "level": 1,
+        "decay": 1,
+        "cutoff": 700,
+        "resonance": 0.45,
+        "drive": 0,
+        "reverb": 0,
+        "delay": 0,
+        "delayBeats": 0.5,
+        "feedback": 0.3
+      },
+      "keys": {
+        "sound": "original",
+        "level": 1,
+        "decay": 1,
+        "cutoff": 3400,
+        "resonance": 0.45,
+        "drive": 0,
+        "reverb": 0.17,
+        "delay": 0,
+        "delayBeats": 0.5,
+        "feedback": 0.3
+      },
+      "melody": {
+        "sound": "original",
+        "level": 1,
+        "decay": 1,
+        "cutoff": 2800,
+        "resonance": 0.45,
+        "drive": 0,
+        "reverb": 0.17,
+        "delay": 0,
+        "delayBeats": 0.5,
+        "feedback": 0.3
+      }
+    }
+  },
+  "appearance": {
+    "wireframeColor": "#ffffff"
+  },
+  "floor": {
+    "roughness": 0.52,
+    "depth": 0,
+    "tileSize": 2,
+    "color": "#3c6c85"
+  },
+  "fog": {
+    "enabled": true,
+    "color": "#000000",
+    "near": 10,
+    "far": 30
+  },
+  "infoLayout": {
+    "size": 3,
+    "column": -1,
+    "row": -1
+  },
+  "camera": {
+    "follow": true,
+    "optimizedTextures": false,
+    "followSmoothing": 0.45,
+    "yaw": 0,
+    "elevation": 0,
+    "distance": 7,
+    "offsetX": 0,
+    "offsetY": 0,
+    "offsetZ": 0,
+    "fov": 42
+  },
+  "visibility": {
+    "wireframe": true,
+    "ground": false,
+    "fps": false,
+    "text": false
+  }
+}

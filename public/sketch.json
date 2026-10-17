@@ -1,0 +1,61 @@
+{
+  "id": "2026-10-16",
+  "title": "2026-10-16",
+  "created": "2026-10-16",
+  "entry": "./",
+  "protocol": "sketch-player:v1",
+  "capabilities": [
+    "play",
+    "pause",
+    "reset",
+    "get-setup",
+    "setup",
+    "save-setup",
+    "load-setup"
+  ],
+  "sound": "none",
+  "description": "A viewport-sized polygon mesh drawn as a wireframe, ready for n-sided face editing.",
+  "schemaVersion": 1,
+  "date": "2026-10-16",
+  "datePrecision": "day",
+  "author": "Lars Berg",
+  "tags": [
+    "threejs",
+    "mesh",
+    "ngons",
+    "wireframe",
+    "strudel",
+    "interactive"
+  ],
+  "madeWith": [
+    "threejs",
+    "strudel",
+    "web-audio"
+  ],
+  "audio": "none",
+  "thumbnail": {
+    "src": "./thumbnail.svg",
+    "width": 1200,
+    "height": 900,
+    "alt": "Wireframe grid of nearly square polygon faces."
+  },
+  "embed": {
+    "src": "./?embed=1",
+    "allow": [
+      "autoplay",
+      "fullscreen"
+    ],
+    "resize": "container",
+    "controls": [
+      "play",
+      "pause",
+      "reset",
+      "get-setup",
+      "setup",
+      "save-setup",
+      "load-setup"
+    ],
+    "protocol": "sketch-player:v1",
+    "parentOriginParameter": "parentOrigin"
+  }
+}
