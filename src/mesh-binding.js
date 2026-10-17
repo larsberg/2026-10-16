@@ -11,6 +11,11 @@ export function createExtrusionBinding(mesh, extrusions = []) {
     if (lengths.some(length => length < 1e-7)) continue;
     const axis = centers.at(-1).clone().sub(centers[0]).normalize();
     const radius = Math.max(...rings[0].map(id => new Vector3(...mesh.vertices[id]).sub(centers[0]).cross(axis).length()));
+    const baseArea = Math.abs(rings[0].reduce((area, id, i) => {
+      const a = new Vector3(...mesh.vertices[id]).sub(centers[0]);
+      const b = new Vector3(...mesh.vertices[rings[0][(i + 1) % rings[0].length]]).sub(centers[0]);
+      return area + a.cross(b).dot(axis) / 2;
+    }, 0));
     // Capture the extruded face's own frame and footprint before smoothing or
     // dual operations replace its vertices. Y follows the extrusion; X follows
     // the face's first edge, so rectangular faces keep their exact dimensions.
@@ -25,7 +30,7 @@ export function createExtrusionBinding(mesh, extrusions = []) {
     });
     const rootBone = boneCount++, segmentBones = lengths.map(() => boneCount++);
     const chain = { id: chains.length, sourceFace, centers: centers.map(v => v.toArray()), axis: axis.toArray(), lengths,
-      radius: Math.max(1e-5, radius), rotation: rotation.toArray(), crossSections, rootBone, segmentBones };
+      radius: Math.max(1e-5, radius), baseArea, volume: baseArea * lengths.reduce((sum, length) => sum + length, 0), rotation: rotation.toArray(), crossSections, rootBone, segmentBones };
     rings.slice(1).forEach((ids, segment) => ids.forEach(id => { weights[id] = [[segmentBones[segment], 1]]; }));
     chains.push(chain);
   }

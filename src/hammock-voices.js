@@ -1,6 +1,7 @@
 import { noteToMidi } from '@strudel/core';
 import { defaultInstruments, instrumentLevel } from './instrument-settings.js';
 import { createInstrumentChannel } from './instrument-channel.js';
+import { referenceSounds, renderReferenceVoice } from './reference-instruments.js';
 
 // Procedural instruments only: oscillator partials, filtered noise and a
 // synthesized room impulse. No recording, sample-bank URL or decoded audio.
@@ -44,12 +45,28 @@ export function createHammockVoices(context,destination){
     const scale={bass:.4,keys:.14,melody:.3,kick:.66,snare:.55,hat:.35};
     gain.gain.value=value.gain*(scale[value.layer]??.2);
     envelope.connect(gain).connect(channel.input);
+    if(referenceSounds.includes(sound)){
+      const frequency=note=>440*2**(((noteToMidi(note)+(Number(value.ctranspose)||0))-69)/12);
+      const samples=renderReferenceVoice({sound,hz:pitched?frequency(value.note):75,
+        fromHz:value.glideFrom===undefined?undefined:frequency(value.glideFrom),duration,
+        sampleRate:context.sampleRate,decay,seed:value.timbreSeed??173,vowel:value.vowel??0,
+        open:value.s==='oh',detune:value.detune??0,glideTime:value.glideTime??.65});
+      const buffer=context.createBuffer(1,samples.length,context.sampleRate);buffer.copyToChannel(samples,0);
+      const player=source(context.createBufferSource());player.buffer=buffer;player.connect(envelope);
+      gain.gain.value=value.gain;envelope.gain.value=1;player.start(at);
+      return;
+    }
     function osc(hz,length,target=envelope,amount=1,waveform='sine',tuned=false,detune=0){
       const o=source(context.createOscillator()),g=node(context.createGain());o.frequency.value=hz;g.gain.value=amount;
       if(typeof waveform==='string')o.type=waveform;else o.setPeriodicWave(waveform);
       if(tuned){
-        const cents=Float32Array.from({length:48},(_,i)=>{const t=at+i/47*length;return -32+detune+4*Math.sin(t*2*Math.PI*.31)+1.5*Math.sin(t*2*Math.PI*1.7);});
+        const cents=Float32Array.from({length:48},(_,i)=>{const t=at+i/47*length;return Number(value.detune??-32)+detune+(value.wow??1)*(4*Math.sin(t*2*Math.PI*.31)+1.5*Math.sin(t*2*Math.PI*1.7));});
         o.detune.setValueCurveAtTime(cents,at,length);
+        if(value.glideFrom!==undefined){
+          const interval=noteToMidi(value.glideFrom)-noteToMidi(value.note);
+          o.frequency.setValueAtTime(hz*2**(interval/12),at);
+          o.frequency.exponentialRampToValueAtTime(hz,at+Math.min(length*.7,value.glideTime??.12));
+        }
       }
       o.connect(g).connect(target);o.start(at);o.stop(at+length);return o;
     }
@@ -94,6 +111,21 @@ export function createHammockVoices(context,destination){
         attack=.045;sustain=.7;osc(hz,length,target,1,'sine',true);osc(hz*2,length,target,.07,'sine',true);hiss('bandpass',1800,length,.025,target);
       }else if(sound==='lead'){
         attack=.008;sustain=.65;osc(hz,length,target,.8,'sawtooth',true);osc(hz/2,length,target,.15,'triangle',true);
+      }else if(sound==='pulse'){
+        attack=.004;body=Math.min(length*.3,.12);sustain=.55;release=Math.min(length*.2,.09);
+        osc(hz,length,target,.55,'square',true);osc(hz,length,target,.5,'sine',true);
+      }else if(sound==='guitar'){
+        attack=.002;body=Math.min(length*.25,.055);sustain=.12;release=Math.min(length*.4,.18);
+        osc(hz,length,target,.8,waves.electric,true);osc(hz*2,length*.45,target,.09,'triangle',true);
+        hiss('bandpass',2400,Math.min(length,.018),.055,target);
+      }else if(sound==='vowel'){
+        attack=Math.min(.035,length*.2);body=Math.min(.12,length*.3);sustain=.6;release=Math.min(.18,length*.3);
+        const formants=[[650,1100],[400,1800],[350,2200]][(Number(value.vowel)||0)%3];
+        formants.forEach((frequency,i)=>{
+          const formant=node(context.createBiquadFilter());formant.type='bandpass';formant.frequency.value=frequency;formant.Q.value=4;
+          formant.connect(target);osc(hz,length,formant,i?.2:.45,'sawtooth',true);
+        });
+        osc(hz,length,target,.3,'sine',true);hiss('bandpass',2200,length,.018,target);
       }
     }else if(value.layer==='kick'){
       const [tail,start,end,sweep]=({original:[.3,128,48,.045],sub:[.65,110,42,.09],tight:[.17,155,62,.025],punch:[.32,185,52,.028]})[sound];

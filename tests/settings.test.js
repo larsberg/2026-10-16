@@ -19,13 +19,13 @@ test('local Save/Reload roundtrips mesh settings and rejects invalid writes atom
     return res;
   }
   try {
-    const setup=mergeMeshSetup(defaultMeshSetup(),{mesh:{shortSideSubdivisions:7},pipeline:{seed:42,insetScale:.75,minDepth:1.5,maxDepth:2.5,segments:3,triangulateEnabled:false,faceCenterDualEnabled:false,averageVerticesEnabled:false,insetEnabled:false,extrusionEnabled:false,excludeInitialBorderTriangles:false},editing:{selectedOnly:true},extrusion:{depth:1.2,rotateZ:35,scaleX:.7,scaleY:.9},appearance:{wireframeColor:'#aabbcc'},camera:{yaw:30},audio:{bpm:128}});
+    const setup=mergeMeshSetup(defaultMeshSetup(),{mesh:{radius:2.5},pipeline:{seed:42,insetScale:.75,minDepth:1.5,maxDepth:2.5,segments:3,triangulateEnabled:false,faceCenterDualEnabled:false,averageVerticesEnabled:false,insetEnabled:false,extrusionEnabled:false,excludeInitialBorderTriangles:false},editing:{selectedOnly:true},extrusion:{depth:1.2,rotateZ:35,scaleX:.7,scaleY:.9},appearance:{wireframeColor:'#aabbcc'},camera:{yaw:30},audio:{bpm:128}});
     assert.equal((await request('PUT',setup)).statusCode,200);
     assert.deepEqual((await request('GET')).body,setup);
     const rigSetup=mergeMeshSetup(setup,{rig:{gravity:3,coneAngle:25,twistAngle:40,linearDamping:3.25,angularDamping:6.5,hoverEnabled:false,hoverAcceleration:25,showColliders:true,simulate:false},pipeline:{hexelateEnabled:false,segmentLength:.25},materials:{mesh:{normalMix:.8,roughness:.6,color:'#aabbcc'}},visibility:{surface:true,wireframe:true}});
     assert.equal((await request('PUT',rigSetup)).statusCode,200);
     assert.deepEqual((await request('GET')).body,rigSetup);
-    assert.equal((await request('PUT',{...setup,mesh:{shortSideSubdivisions:2.5}})).statusCode,400);
+    assert.equal((await request('PUT',{...setup,mesh:{radius:0}})).statusCode,400);
     assert.deepEqual(JSON.parse(await readFile(file,'utf8')),rigSetup);
   } finally {await rm(directory,{recursive:true,force:true});}
 });
@@ -35,7 +35,7 @@ test('production settings use the embedded setup and isolate device saves by URL
   const bundledSetup=defaultMeshSetup(),url='https://example.test/2026-10-16/setup.json';
   const options={url,storage,bundledSetup,validate:validateMeshSetup,fetcher:()=>assert.fail('Unexpected setup fetch')};
   assert.deepEqual(await requestStaticSetup(options),bundledSetup);
-  const saved=mergeMeshSetup(bundledSetup,{mesh:{shortSideSubdivisions:8},appearance:{wireframeColor:'#00aaff'}});
+  const saved=mergeMeshSetup(bundledSetup,{mesh:{radius:3},appearance:{wireframeColor:'#00aaff'}});
   await requestStaticSetup({...options,method:'PUT',value:saved});
   assert.deepEqual(await requestStaticSetup(options),saved);
   assert.deepEqual(await requestStaticSetup({...options,url:'https://example.test/another/setup.json'}),bundledSetup);

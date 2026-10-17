@@ -43,12 +43,12 @@ export function meshControlsMarkup() {
         <p class="setup-status" role="status" aria-live="polite">Loading settings…</p>
         <fieldset class="panel-body">
           <section id="panel-mesh" role="tabpanel" aria-labelledby="tab-mesh">
-            <p class="control-heading">Viewport grid</p>${fields('mesh')}
-            <p class="camera-hint">The short side uses this many divisions. The long side rounds to the nearest whole number of cells to keep them close to square. Resizing regenerates the mesh.</p>
+            <p class="control-heading">Dodecahedron</p>${fields('mesh')}
+            <p class="camera-hint">The starting mesh has twelve pentagonal faces. Radius sets its size; the existing operation layers build the pieces around it.</p>
             <details class="material-group" open><summary>Operation layers</summary>
               <p class="camera-hint">Toggle each pass below; enabled passes run in numbered order. Average vertices runs after the face-center dual and before inset, using connected neighbors while keeping boundary vertices fixed. Border descendants can be excluded from inset and extrusion. Smoothing also keeps the boundary fixed. The final dual clears selection.</p>
               ${meshFields.pipeline.filter(([key]) => key !== 'seed').map(field => fieldMarkup('pipeline', field)).join('')}
-              <p class="camera-hint">Each piece uses floor(extrusion amount) segments, with a minimum of one. Extrusion length per segment sets their length: total depth = segment count × segment length.</p>
+              <p class="camera-hint">Maximum chains limits the extruded pieces to 1–32, spread around the body; other faces stay in the base. Each piece uses floor(extrusion amount) segments, with a minimum of one. Extrusion length per segment sets their length: total depth = segment count × segment length.</p>
               <div class="camera-controls">${fieldMarkup('pipeline', meshFields.pipeline.find(([key]) => key === 'seed'))}</div>
               <button type="button" data-mesh-action="randomize">New variation</button>
               <p class="camera-hint">Triangulate before Hexelate splits the current faces with seeded random diagonals. The face-center dual forms polygon cells, mostly with five to seven sides. The final Average vertices pass relaxes them while keeping the boundary fixed. Disable triangulation to take the direct dual of the previous pass. Mesh wireframe shows the polygon edges.</p>
@@ -56,7 +56,7 @@ export function meshControlsMarkup() {
               <p class="face-sides camera-hint"></p>
             </details>
             <p class="control-heading">Faces</p>
-            <p class="camera-hint">Click a face to select it. Shift-click toggles more faces. Drag to orbit. Selected edges are amber.</p>
+            <p class="camera-hint">Drag a piece to pull its bone chain. Drag empty space to orbit. Shift-click a face to toggle selection; when paused, click selects faces. Selected edges are amber.</p>
             <div class="field-actions"><button type="button" data-mesh-action="selectAll">Select all</button><button type="button" data-mesh-action="clearSelection">Clear selection</button></div>
             <p class="face-selection-status" role="status">No faces selected</p>
             ${fields('editing')}
@@ -69,25 +69,33 @@ export function meshControlsMarkup() {
               ${fields('extrusion')}
               <button type="button" data-mesh-action="extrude">Extrude faces</button>
             </details>
-            <p class="camera-hint">Triangulate and Extrude affect all faces unless Only selected faces is checked. Resize, subdivision changes, Reload, and Restart rebuild the operation layers and clear manual edits. Save retains layer and transform controls.</p>
+            <p class="camera-hint">Triangulate and Extrude affect all faces unless Only selected faces is checked. Resize, radius changes, Reload, and Restart rebuild the operation layers and clear manual edits. Save retains layer and transform controls.</p>
             <p class="control-heading">Show</p><div class="visibility-controls">
               ${meshFields.visibility.filter(([key]) => key !== 'fps').map(field => fieldMarkup('visibility', field)).join('')}
             </div><p class="mesh-stats"></p>
           </section>
           <section id="panel-motion" role="tabpanel" aria-labelledby="tab-motion" hidden>
             <details class="material-group" open><summary>Bones &amp; colliders</summary>
-              <p class="camera-hint">Each piece has one collider and bone per extrusion segment. Segment count and length come from the Mesh tab. Each chain has a fixed root and cone-limited joints. Hover over a collider to accelerate it away from the pointer, even with collider outlines hidden. Drag to orbit. Resizing or changing mesh layers rebuilds the rig.</p>
-              ${fields('rig')}
+              <p class="camera-hint">Each piece has one collider and bone per extrusion segment. Segment count and length come from the Mesh tab. Roots attach to the movable central body with cone-limited joints. Drag a piece to lift and move the whole form; drag empty space to orbit. Hover repels colliders, even with outlines hidden. Resizing or changing mesh layers rebuilds the rig.</p>
+              ${meshFields.rig.filter(([key]) => !key.startsWith('note')).map(field => fieldMarkup('rig', field)).join('')}
+              <p class="camera-hint">Joint overlap puts each shared joint half a radius inside each neighboring capsule. At 1× their overlap is one radius; the base and tip keep their original positions.</p>
               <button type="button" data-mesh-action="nudgeRig">Nudge bone chains</button>
               <p class="rig-stats camera-hint"></p>
+            </details>
+            <details class="material-group" open><summary>Music response</summary>
+              <p class="camera-hint">Bass gets the largest 33% of chains (rounded to a whole chain). The remaining instruments share the rest evenly, ordered by register. Each note drives every chain in its instrument group. Note pushes lift and sway the pieces, with roots attached to the body; their strength is independent of note scaling.</p>
+              <p class="camera-hint">Minimum bone scale sets the resting size; maximum sets the peak for a full-strength low note. Zero minimum collapses the chains between notes. These are per-bone scales: each multiplies the scale inherited from its parent. Low notes go to the largest chains; high notes go to the smallest. Note weight influence varies their peak sizes. Attack controls expansion speed; release controls the return to minimum.</p>
+              ${meshFields.rig.filter(([key]) => key.startsWith('note')).map(field => fieldMarkup('rig', field)).join('')}
+              <p class="chain-note-stats camera-hint"></p>
             </details>
           </section>
           <section id="panel-audio" role="tabpanel" aria-labelledby="tab-audio" hidden>
             <p class="control-heading">Strudel</p>${fields('audio')}
-            <p class="camera-hint">No composition yet. Audio stays silent until a score is added. Tempo, levels, instruments, and effects are ready for the generative composition.</p>
-            <p class="camera-hint march-audio-status" role="status">Strudel ready · no composition loaded.</p>
+            <p class="camera-hint">Look No Further · generative study. 82 BPM, rounded sliding bass, dry drums, wiry guitar and a breathy low voice. The guitar enters after the opening groove; the voice enters with the low bass section. Enable audio to listen.</p>
+            <p class="camera-hint">While a piece is held, random notes from these instruments replace the song. Release to return to the song at its current position. Note density controls the intensity of the improvisation; instrument levels and effects still apply.</p>
+            <p class="camera-hint march-audio-status" role="status">Composition ready · enable audio to listen.</p>
             <p class="control-heading">Instruments</p>
-            <p class="camera-hint">Set each part's sound and effects for the future score. Save retains these settings.</p>
+            <p class="camera-hint">Guitar / high instruments and Voice / lead each have their own sound, decay, filter, distortion, reverb and delay controls below. Their notes drive smaller chains; bass notes drive larger ones. Save retains the sound and motion settings.</p>
             ${instrumentControlsMarkup()}
           </section>
           <section id="panel-materials" role="tabpanel" aria-labelledby="tab-materials" hidden>
@@ -100,7 +108,7 @@ export function meshControlsMarkup() {
             <details class="material-group" open><summary>Fog</summary>${fields('fog')}<p class="camera-hint">Fades distant surfaces into the fog color, even with the lights off. Start and end distances are measured from the camera.</p></details>
           </section>
           <section id="panel-camera" role="tabpanel" aria-labelledby="tab-camera" hidden>
-            <p class="control-heading">Camera</p><p class="camera-hint">Drag the mesh to orbit; scroll or pinch to zoom. Follow uses the mesh center. Offsets are relative to that center with Follow on, or world coordinates with Follow off. Your view and Follow setting are saved.</p>
+            <p class="control-heading">Camera</p><p class="camera-hint">Drag empty space to orbit; scroll or pinch to zoom. Follow uses the mesh center. Offsets are relative to that center with Follow on, or world coordinates with Follow off. Your view and Follow setting are saved.</p>
             ${meshFields.camera.filter(([, , value]) => typeof value === 'boolean').map(field => fieldMarkup('camera', field)).join('')}<div class="camera-controls">${meshFields.camera.filter(([, , value]) => typeof value !== 'boolean').map(field => fieldMarkup('camera', field)).join('')}</div><button class="reset-camera">Reset camera</button>
           </section>
           <section id="panel-info" role="tabpanel" aria-labelledby="tab-info" hidden>
@@ -180,7 +188,9 @@ export function bindMeshControls(shell, { ui, change, playPause, reset, resetCam
     editing({ selected, faces, canUndo, layers = [], faceSides = {}, rig }) {
       query('.layer-stats').textContent = layers.map(stage => `${stage.name}: ${stage.faces} faces`).join(' · ');
       query('.face-sides').textContent = `Final polygons · ${Object.entries(faceSides).sort(([a], [b]) => Number(a) - Number(b)).map(([sides, count]) => `${count} with ${sides} sides`).join(' · ')}`;
-      query('.rig-stats').textContent = rig ? `${rig.chains} fixed-root chains · ${rig.bones} bones · ${rig.joints} cone joints · ${rig.colliders} piece colliders · ${rig.baseColliders} static base plane` : 'No active rig. Enable extrusion and binding, or regenerate after manual edits.';
+      query('.rig-stats').textContent = rig ? `${rig.chains} body-rooted chains · ${rig.bones} bones · ${rig.joints} cone joints · ${rig.colliders} piece colliders · ${rig.baseColliders} ground plane` : 'No active rig. Enable extrusion and binding, or regenerate after manual edits.';
+      const names={bass:'Bass',keys:'Guitar',melody:'Voice',kick:'Kick',snare:'Snare',hat:'Hats'};
+      query('.chain-note-stats').textContent = rig ? Object.entries(rig.noteGroups??{}).map(([layer,count])=>`${names[layer]??layer}: ${count} chains`).join(' · ') : '';
       query('.face-selection-status').textContent = `${selected} / ${faces} faces selected`;
       query('[data-mesh-action="undo"]').disabled = !canUndo;
     },

@@ -1,6 +1,7 @@
 import { createSeededRandom } from './mesh-layers.js';
 import { bindFaceSelection } from './face-selection.js';
 import { bindColliderHover } from './collider-hover.js';
+import { bindColliderDrag } from './collider-drag.js';
 import { fitMeshShadows } from './mesh-shadows.js';
 import { extrusionTransform } from './mesh-operations.js';
 import { createMeshView } from './mesh-view.js';
@@ -12,6 +13,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { createFaceMetal, createStudioEnvironment } from './face-metal.js';
 import { bindFocusPlayback } from './focus-playback.js';
 import { createMarchAudio } from './march-audio.js';
+import { createReferenceScore } from './reference-score.js';
+import { notePaletteForPattern } from './chain-notes.js';
 import { bindAudioAutoplay } from './audio-autoplay.js';
 import { createCompositionPalette } from './composition-palette.js';
 import Stats from 'three/addons/libs/stats.module.js';
@@ -43,7 +46,7 @@ export async function mountMesh(root,{ui=true}={}) {
   renderer.setPixelRatio(Math.min(devicePixelRatio,matchMedia('(pointer: coarse)').matches?1.5:2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFShadowMap;
   renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.1;
   renderer.domElement.className='scene-canvas';renderer.domElement.tabIndex=0;
-  renderer.domElement.setAttribute('aria-label','Viewport polygon mesh. Hover to repel bone colliders; drag to orbit; scroll or pinch to zoom.');
+  renderer.domElement.setAttribute('aria-label','Viewport polygon mesh. Drag pieces to pull chains; drag empty space to orbit; Shift-click selects faces; scroll or pinch to zoom.');
   shell.prepend(renderer.domElement);
   const scene=new THREE.Scene();scene.background=new THREE.Color('#000000');
   const camera=new THREE.PerspectiveCamera(42,1,0.1,1000);camera.position.set(6.2,4.9,9.2);
@@ -63,12 +66,14 @@ export async function mountMesh(root,{ui=true}={}) {
   textProp.mesh.rotation.x=-Math.PI/2;textProp.mesh.position.set(0,0.015,0);scene.add(textProp.mesh);
   const effects=createSceneEffects(renderer,scene,camera,{clampBeauty:false});
   let running=true,disposed=false,last=0,dirty=true,statsTime=0,frameMs=16.67;
-  let panel,lightingControls,stats,focus,applyingCamera=false,setupBusy=false;
+  let panel,lightingControls,stats,focus,colliderDrag,applyingCamera=false,setupBusy=false;
   const audioStatus=shell.querySelector('.march-audio-status');
-  const marchAudio=createMarchAudio({canPlay:()=>running&&!document.hidden,onStatus:message=>{audioStatus.textContent=message;}});
+  const composition=createReferenceScore();
+  views.setNotePalette(notePaletteForPattern(composition));
+  const marchAudio=createMarchAudio({pattern:composition,canPlay:()=>running&&!document.hidden,onStatus:message=>{audioStatus.textContent=message;}});
   const paletteMotion=createCompositionPalette({environment,scene,sun,hemisphere,lighting:settings.lighting});
   const setupAbort=new AbortController(),followTarget=new THREE.Vector3(),worldOrigin=new THREE.Vector3();
-  const groupCenter=()=>followTarget.set(0,0,0);
+  const groupCenter=()=>views.getCenter(followTarget);
   const cameraFollow=createCameraFollow(groupCenter()),follow=cameraFollow.position;
   const markChanged=()=>panel?.status('Unsaved changes');
   const materialControls=bindMaterialControls(shell,{mesh:meshMaterial,text:textProp.material},()=>{
@@ -83,7 +88,7 @@ export async function mountMesh(root,{ui=true}={}) {
       views.configure(settings);
     },settings.lighting);
   const infoControls=bindInfoControls(shell,info=>{textProp.setInfo(info);markChanged();},message=>panel?.status(message,true));
-  const followSuspended=()=>orbitDragging;
+  const followSuspended=()=>orbitDragging||colliderDrag?.active;
   function stopCameraForDrag() {
     applyingCamera=true;
     try{stopCameraMotion(camera,controls);}
@@ -107,7 +112,7 @@ export async function mountMesh(root,{ui=true}={}) {
     const currentCamera=getSetup().camera;
     const restoringView=value.version!==undefined,followChanged=next.camera.follow!==currentCamera.follow;
     const cameraChanged=restoringView||followChanged||['yaw','elevation','distance','offsetX','offsetY','offsetZ'].some(key=>next.camera[key]!==currentCamera[key]);
-    const meshChanged=next.mesh.shortSideSubdivisions!==settings.mesh.shortSideSubdivisions||next.camera.fov!==settings.camera.fov||JSON.stringify(next.pipeline)!==JSON.stringify(settings.pipeline);
+    const meshChanged=next.mesh.radius!==settings.mesh.radius||next.camera.fov!==settings.camera.fov||JSON.stringify(next.pipeline)!==JSON.stringify(settings.pipeline);
     settings=next;
     if(cameraChanged){cameraFollow.reset(groupCenter());}
     if(followChanged&&!restoringView){
@@ -198,16 +203,26 @@ export async function mountMesh(root,{ui=true}={}) {
     resetCamera(){apply({camera:defaultMeshSetup().camera});},save:saveSetup,load:loadSetup,meshAction});
   const faceSelection=bindFaceSelection({element:renderer.domElement,camera,view:views,canSelect:()=>!setupBusy,
     onChange(){dirty=true;syncEditing();}});
+  colliderDrag=bindColliderDrag({element:renderer.domElement,camera,controls,getRig:()=>views.rig,
+    canInteract:()=>running&&!setupBusy&&settings.rig.simulate,
+    onDragChange(active){if(active)stopCameraForDrag();marchAudio.setDragging(active);}});
   const colliderHover=bindColliderHover({element:renderer.domElement,camera,getRig:()=>views.rig,
-    canInteract:()=>running&&!setupBusy&&!orbitDragging});
-  function endDrag(){orbitDragging=false;}
+    canInteract:()=>running&&!setupBusy&&!orbitDragging&&!colliderDrag.active});
+  function endDrag(){orbitDragging=false;colliderDrag?.end();}
   focus=bindFocusPlayback({isRunning:()=>running,pause,play});
   const unbindAudio=bindAudioAutoplay({audio:marchAudio,target:document,shouldEnable:()=>false,beforeRetry:()=>focus.interact()});
   let viewportWidth=0,viewportHeight=0;
   function regenerate() {
     if(!viewportWidth||!viewportHeight)return;
+    endDrag();
     camera.updateMatrixWorld();
     views.regenerate(camera,settings);dirty=true;syncEditing();
+    // Regeneration places a fresh body above the floor. Preserve the orbit,
+    // but move its follow target to that new body immediately.
+    if(settings.camera.follow){
+      const delta=groupCenter().clone().sub(follow);camera.position.add(delta);controls.target.add(delta);
+      cameraFollow.reset(groupCenter());controls.update();
+    }
     fitMeshShadows(sun,views.surface?.mesh);
   }
   const resize=new ResizeObserver(()=>{
@@ -228,26 +243,28 @@ export async function mountMesh(root,{ui=true}={}) {
     if(disposed)return;
     if(last)frameMs+=(time-last-frameMs)*0.06;
     const dt=last?Math.min((time-last)/1000,0.05):0;last=time;
-    paletteMotion.update(dt);
     if(dirty||time-statsTime>400) {
       const mesh=views.topology;
-      if(mesh)panel.stats(`${Math.round(1000/frameMs)} fps · ${mesh.columns} × ${mesh.rows} cells base grid · ${mesh.vertices.length} vertices · ${mesh.faces.length} faces · ${views.edges.length} edges`);
+      if(mesh)panel.stats(`${Math.round(1000/frameMs)} fps · dodecahedron base · ${mesh.vertices.length} vertices · ${mesh.faces.length} faces · ${views.edges.length} edges`);
       syncEditing();dirty=false;statsTime=time;
     }
     cameraFollow.update(camera,controls,groupCenter(),settings.camera.follow,followSuspended(),dt,settings.camera.followSmoothing);
-    lightingControls.updatePosition(worldOrigin);
+    lightingControls.updatePosition(groupCenter());
     controls.update();
-    colliderHover.update();
+    colliderDrag.update();colliderHover.update();
+    const noteEvents=marchAudio.drainEvents();
+    if(noteEvents.length){views.rig?.triggerNotes(noteEvents);}
+    paletteMotion.update(dt);
     views.update(dt,running);
     fitMeshShadows(sun,views.surface?.mesh);
     effects.render();startup.reveal();stats?.update();
   });
   const thumbnailCapture = import.meta.env.DEV ? bindThumbnailCapture(shell, renderer.domElement, () => effects.render()) : null;
   const api={play,pause(){focus.cancelResume();pause();},reset,setup:apply,getSetup,saveSetup,loadSetup,getState:()=>({running,audio:marchAudio.playing,faces:views.topology?.faces.length??0}),
-    editMesh:meshAction,audio:marchAudio,setComposition:pattern=>marchAudio.setPattern(pattern),paletteMotion,scene,
-    get mesh(){return views;},environment,renderer,camera,controls,
+    editMesh:meshAction,audio:marchAudio,setComposition(pattern){const palette=notePaletteForPattern(pattern);views.setNotePalette(palette);return marchAudio.setPattern(pattern);},paletteMotion,scene,
+    get mesh(){return views;},environment,renderer,camera,controls,colliderDrag,
     dispose(){disposed=true;startup.dispose();renderer.setAnimationLoop(null);setupAbort.abort();unbindAudio();marchAudio.dispose();focus.dispose();resize.disconnect();faceSelection.dispose();controls.removeEventListener('start',startOrbit);controls.removeEventListener('end',endOrbit);controls.dispose();panel.dispose();infoControls.dispose();thumbnailCapture?.dispose(); effects.dispose();stats?.dom.remove();
-      colliderHover.dispose();views.dispose();meshMaterial.dispose();tileFloor.dispose();
+      colliderDrag.dispose();colliderHover.dispose();views.dispose();meshMaterial.dispose();tileFloor.dispose();
       const geometries=new Set(),materials=new Set();scene.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});
       geometries.delete(textProp.mesh.geometry);materials.delete(textProp.material);textProp.dispose();geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());environment.dispose();sun.shadow.dispose();renderer.dispose();shell.remove();if(window.__meshSketch===api)delete window.__meshSketch;
     }};

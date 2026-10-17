@@ -2,7 +2,7 @@ import { instrumentGroups, instrumentFields } from './instrument-settings.js';
 
 export function instrumentControlsMarkup() {
   return instrumentGroups.map(({ key, label, sounds }) => `
-    <details class="material-group" ${key === 'kick' ? 'open' : ''}>
+    <details class="material-group" ${['keys', 'melody'].includes(key) ? 'open' : ''}>
       <summary>${label}</summary>
       <div class="field-select"><label for="instrument-${key}-sound">Sound</label>
         <select id="instrument-${key}-sound" data-instrument="${key}" data-parameter="sound">${sounds.map(([id, name]) => `<option value="${id}">${name}</option>`).join('')}</select>

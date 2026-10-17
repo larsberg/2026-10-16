@@ -4,6 +4,7 @@ import { BufferGeometry, Float32BufferAttribute, MeshBasicMaterial, Quaternion, 
 import { createExtrusionBinding } from '../src/mesh-binding.js';
 import { extrudeFaces, extrusionTransform, triangulateFace } from '../src/mesh-operations.js';
 import { createMeshRig, initMeshRigPhysics } from '../src/mesh-rig.js';
+import { fitColliders } from '../src/collider-fit.js';
 
 await initMeshRigPhysics();
 const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-6,`${a} != ${b}`);
@@ -26,7 +27,7 @@ test('scaled unit capsules match each assigned face dimensions and orientation o
     for (const [piece,chain] of rig.chains.entries()) for (const link of chain.links) {
       assert.equal(link.shape.getType(),'hull'); // The scaled rounded template is the physical hull.
       assert.equal(link.debug.geometry.type,'CapsuleGeometry');
-      near(link.halfExtents.x,piece ? .2 : 2);near(link.halfExtents.z,piece ? 1 : .5);near(link.halfExtents.y,.5);
+      near(link.halfExtents.x,piece ? .2 : 2);near(link.halfExtents.z,piece ? 1 : .5);near(link.halfExtents.y,(link.length+link.lowerInset+link.upperInset)/2);
       const attr=link.debug.geometry.getAttribute('position'),rotation=new Quaternion().copy(link.body.getRotation());
       const min=new Vector3(Infinity,Infinity,Infinity),max=new Vector3(-Infinity,-Infinity,-Infinity);
       for(let i=0;i<attr.count;i++) {
@@ -81,4 +82,26 @@ test('an asymmetric face offsets its scaled capsule without moving the bone rest
     assert.ok(anchor.distanceTo(new Vector3(...binding.chains[0].centers[0]))<1e-6);
     const posed=rig.getPositions();posed.forEach((value,i)=>near(value,surface.attributes.position.array[i]));
   } finally {rig.dispose();surface.dispose();material.dispose();}
+});
+
+test('neighboring capsules overlap by one radius with inset joints and unchanged base, tip and skin',()=>{
+  const base={vertices:rectangle(2,1),faces:[[0,1,2,3]]};
+  const raised=extrudeFaces(base,undefined,extrusionTransform({depth:3}),{segments:3});
+  const binding=createExtrusionBinding(raised.mesh,raised.extrusions),surface=geometry(raised.mesh),material=new MeshBasicMaterial();
+  const rig=createMeshRig(binding,surface,material);
+  try {
+    const links=rig.chains[0].links;
+    for(let i=1;i<links.length;i++) {
+      const a=links[i-1],b=links[i];
+      const overlap=(a.body.getPosition().z/rig.physicsScale+a.halfExtents.y)-(b.body.getPosition().z/rig.physicsScale-b.halfExtents.y);
+      near(overlap,.5);near(a.upperInset,.25);near(b.lowerInset,.25);
+      const joint=rig.chains[0].joints[i];
+      const pa=new Vector3().copy(joint.bodyA.getWorldPoint(joint.localFrameA.position)),pb=new Vector3().copy(joint.bodyB.getWorldPoint(joint.localFrameB.position));
+      near(pa.distanceTo(pb),0);
+    }
+    near(links[0].body.getPosition().z-links[0].halfExtents.y,0);
+    near(links.at(-1).body.getPosition().z+links.at(-1).halfExtents.y,3);
+    rig.getPositions().forEach((v,i)=>near(v,surface.attributes.position.array[i]));
+    for(const fit of fitColliders(binding,{jointOverlap:0})[0]){near(fit.capsuleScale.y,1);near(fit.offset.y,0);}
+  }finally{rig.dispose();surface.dispose();material.dispose();}
 });

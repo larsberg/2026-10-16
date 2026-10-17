@@ -1,10 +1,10 @@
 export const instrumentGroups = [
-  { key: 'kick', label: 'Kick', sounds: [['original', 'Hammock kick'], ['sub', 'Deep sub'], ['tight', 'Tight kick'], ['punch', 'Punch kick']] },
-  { key: 'snare', label: 'Snare', sounds: [['original', 'Hammock snare'], ['brush', 'Brush'], ['clap', 'Handclap'], ['rim', 'Rimshot']] },
-  { key: 'hat', label: 'Hats', sounds: [['original', 'Hammock hat'], ['closed', 'Tight closed hat'], ['open', 'Open hat'], ['metal', 'Metallic hat']] },
-  { key: 'bass', label: 'Bass', sounds: [['original', 'Hammock bass'], ['sub', 'Sine sub'], ['reese', 'Detuned saws'], ['pluck', 'Plucked bass']] },
-  { key: 'keys', label: 'Chords', sounds: [['original', 'Hammock keys'], ['electric', 'Electric keys'], ['bell', 'Bells'], ['pad', 'Soft pad']] },
-  { key: 'melody', label: 'Melody', sounds: [['original', 'Hammock melody'], ['flute', 'Flute'], ['pluck', 'Pluck'], ['lead', 'Saw lead']] },
+  { key: 'kick', label: 'Kick', sounds: [['suuns-kick', 'Reference · low drum'], ['original', 'Hammock kick'], ['sub', 'Deep sub'], ['tight', 'Tight kick'], ['punch', 'Punch kick']] },
+  { key: 'snare', label: 'Snare', sounds: [['suuns-snare', 'Reference · dry snare'], ['original', 'Hammock snare'], ['brush', 'Brush'], ['clap', 'Handclap'], ['rim', 'Rimshot']] },
+  { key: 'hat', label: 'Hats', sounds: [['suuns-hat', 'Reference · loose hat'], ['original', 'Hammock hat'], ['closed', 'Tight closed hat'], ['open', 'Open hat'], ['metal', 'Metallic hat']] },
+  { key: 'bass', label: 'Bass', sounds: [['suuns-bass', 'Reference · rounded slide'], ['original', 'Hammock bass'], ['sub', 'Sine sub'], ['reese', 'Detuned saws'], ['pluck', 'Plucked bass'], ['pulse', 'Pulse bass']] },
+  { key: 'keys', label: 'Guitar / high instruments', sounds: [['suuns-guitar', 'Reference · wiry guitar'], ['original', 'Hammock keys'], ['electric', 'Electric keys'], ['bell', 'Bells'], ['pad', 'Soft pad'], ['guitar', 'Muted electric guitar']] },
+  { key: 'melody', label: 'Voice / lead', sounds: [['suuns-voice', 'Reference · breathy low voice'], ['original', 'Hammock melody'], ['flute', 'Flute'], ['pluck', 'Pluck'], ['lead', 'Saw lead'], ['vowel', 'Vowel synth']] },
 ];
 
 export const instrumentFields = [

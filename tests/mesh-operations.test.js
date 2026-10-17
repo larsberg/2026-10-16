@@ -117,12 +117,17 @@ test('invalid dual topology and collapsed extrusion fail without mutating the in
 });
 
 test('view operations update face picking, selection, undo, and clear edits on regeneration',()=>{
-  const scene=new Scene(),view=createMeshView(scene),camera=new PerspectiveCamera(42,1,.1,1000),settings=defaultMeshSetup(); settings.pipeline.enabled=false;
+  const scene=new Scene(),view=createMeshView(scene),camera=new PerspectiveCamera(42,1,.1,1000),settings=defaultMeshSetup(); settings.pipeline.enabled=false;settings.rig.enabled=false;
   camera.position.set(0,0,7);camera.lookAt(0,0,0);camera.updateMatrixWorld();view.regenerate(camera,settings);
+  camera.position.y=view.object.position.y;camera.lookAt(view.object.position);camera.updateMatrixWorld();
   const before=structuredClone(view.topology),raycaster=new Raycaster();raycaster.setFromCamera(new Vector2(.1,.1),camera);
   const id=view.pickFace(raycaster);assert.ok(Number.isInteger(id));view.selectFaces([id]);
   view.extrude([id],extrusionTransform({depth:.5,scaleX:.8,scaleY:.8}));
-  assert.equal(view.selectedFaces.length,1);assert.equal(view.topology.faces.length,before.faces.length+4);assert.equal(view.canUndo,true);
+  assert.equal(view.selectedFaces.length,1);assert.equal(view.topology.faces.length,before.faces.length+5);assert.equal(view.canUndo,true);
+  const cap=view.topology.faces[view.selectedFaces[0]],center=new Vector3();
+  for(const vertex of cap)center.add(new Vector3(...view.topology.vertices[vertex]));
+  center.divideScalar(cap.length).applyMatrix4(view.object.matrixWorld).project(camera);
+  raycaster.setFromCamera(new Vector2(center.x,center.y),camera);
   assert.equal(view.pickFace(raycaster),view.selectedFaces[0]);
   assert.equal(view.undo(),true);assert.deepEqual(view.topology,before);assert.deepEqual(view.selectedFaces,[id]);
   view.dualNSided();view.triangulate();assert.ok(view.topology.faces.every(f=>f.length===3));

@@ -3,7 +3,7 @@ import { createMeshRig } from './mesh-rig.js';
 import { createMeshSurface } from './mesh-surface.js';
 import { createFaceMetal } from './face-metal.js';
 import { BufferGeometry, DoubleSide, Float32BufferAttribute, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial } from 'three';
-import { createViewportMesh, polygonEdges, viewportDimensions } from './polygon-mesh.js';
+import { createDodecahedronMesh, polygonEdges } from './polygon-mesh.js';
 import { dualDiamond, dualNSided, extrudeFaces, triangulateFace, triangulateFaces, validatePolygonMesh } from './mesh-operations.js';
 
 export function createMeshView(scene, sharedSurfaceMaterial) {
@@ -17,7 +17,7 @@ export function createMeshView(scene, sharedSurfaceMaterial) {
   selection.renderOrder = 10; object.add(selection);
   // The skeleton/picking proxy feeds the visible polygon surface and wireframe.
   const pickingMaterial = new MeshBasicMaterial({ side: DoubleSide, visible: false });
-  let picking = new Mesh(new BufferGeometry(), pickingMaterial), rig, bindingData, configured, posed, selectedEdges = [];
+  let picking = new Mesh(new BufferGeometry(), pickingMaterial), rig, bindingData, configured, posed, selectedEdges = [], notePalette = [];
   object.frustumCulled = false;
   let topology, edges = [], triangleFaces = [], generation = 0, selected = new Set(), layers = { stages: [], depths: [] };
   const history = [];
@@ -49,8 +49,8 @@ export function createMeshView(scene, sharedSurfaceMaterial) {
     const geometry = picking.geometry;
     picking = new Mesh(geometry, pickingMaterial);
     posed = new Float32Array(topology.vertices.flat()); updateBuffers(); posed = undefined;
-    if (configured?.rig?.enabled && bindingData?.chains.length) {
-      rig = createMeshRig(bindingData, geometry, pickingMaterial, configured.rig); object.add(rig.group); picking = rig.skin;
+    if (configured?.rig?.enabled && (bindingData?.chains.length || bindingData?.core)) {
+      rig = createMeshRig(bindingData, geometry, pickingMaterial, configured.rig, notePalette); object.add(rig.group); picking = rig.skin;
       posed = rig.getPositions(); updateBuffers();
     }
   }
@@ -84,6 +84,7 @@ export function createMeshView(scene, sharedSurfaceMaterial) {
   }
   return {
     object,
+    getCenter(target) { object.updateWorldMatrix(true, false); return object.localToWorld(rig?.getCenter(target) ?? target.set(0, 0, 0)); },
     get surface() { return surface; },
     get topology() { return topology; },
     get edges() { return edges; },
@@ -93,13 +94,14 @@ export function createMeshView(scene, sharedSurfaceMaterial) {
     get binding() { return bindingData; },
     get selectedFaces() { return [...selected]; },
     get canUndo() { return history.length > 0; },
+    setNotePalette(value) { notePalette = value; rig?.setNotePalette(value); },
     regenerate(camera, settings) {
-      const dimensions = viewportDimensions(camera, camera.position.length());
-      const base = createViewportMesh(dimensions.width, dimensions.height, settings.mesh.shortSideSubdivisions);
+      const base = createDodecahedronMesh(settings.mesh.radius);
       const next = createMeshLayers(base, settings.pipeline ?? { enabled: false });
       configured = settings;
+      object.quaternion.identity();
+      object.position.set(0, -(next.binding.core?.groundLevel ?? 0), 0);
       install(next.mesh, next.faceIds, next.binding); layers = { stages: next.stages, depths: next.depths };
-      object.quaternion.copy(camera.quaternion);
       history.length = 0; generation++;
     },
     refresh() { install(topology, [...selected], bindingData); },
@@ -128,7 +130,7 @@ export function createMeshView(scene, sharedSurfaceMaterial) {
       install(previous.mesh, previous.faceIds, previous.binding); history.pop(); return true;
     },
     configure(settings) {
-      const rebuild = settings.rig?.enabled !== configured?.rig?.enabled;
+      const rebuild = settings.rig?.enabled !== configured?.rig?.enabled || settings.rig?.jointOverlap !== configured?.rig?.jointOverlap;
       configured = settings;
       material.color.set(settings.appearance.wireframeColor);
       material.visible = settings.visibility.wireframe;

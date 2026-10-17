@@ -113,7 +113,7 @@ test('resize rebuilds the final Hexelate dual and clears manual edit history and
   view.regenerate(camera,settings);assert.equal(view.canUndo,false);assert.deepEqual(view.topology,original);assert.deepEqual(view.selectedFaces,selection);
   camera.aspect=.6;camera.updateProjectionMatrix();view.regenerate(camera,settings);
   const raised=view.layers.stages.find(stage=>stage.name==='Random segmented extrusion'),dual=view.layers.stages.find(stage=>stage.name==='Face-center dual');
-  assert.ok(raised.selected>0);assert.ok(raised.selected<dual.faces);
+  assert.ok(raised.selected>0);assert.equal(raised.selected,Math.min(32,dual.faces));
   assert.equal(view.selectedFaces.length,0);assert.ok(view.topology.vertices.flat().every(Number.isFinite));
   view.dispose();
 });
@@ -272,7 +272,7 @@ test('original diamond border triangles and their dual cells are kept out of ins
     const protectedIds=faceCenterDualEnabled?[...borderVertices]:working.faces.flatMap((face,id)=>triangleKeys.has([...face].sort((a,b)=>a-b).join(':'))?[id]:[]);
     const options={seed:7,triangulateEnabled,faceCenterDualEnabled,insetEnabled,subdivisionEnabled:false,diamondDualEnabled:false};
     const result=createMeshLayers(base,options);
-    assert.equal(result.faceIds.length,working.faces.length-protectedIds.length);
+    assert.equal(result.faceIds.length,Math.min(32,working.faces.length-protectedIds.length));
     assert.equal(result.depths.length,result.faceIds.length);assert.ok(result.faceIds.length>0);
     for(const id of protectedIds) {
       const positions=JSON.stringify(polygonPositions(working,working.faces[id]));
@@ -280,11 +280,24 @@ test('original diamond border triangles and their dual cells are kept out of ins
     }
     for(const id of result.faceIds)for(const position of polygonPositions(result.mesh,result.mesh.faces[id]))assert.ok(position[2]>=1-1e-9&&position[2]<=3+1e-9);
     const included=createMeshLayers(base,{...options,excludeInitialBorderTriangles:false});
-    assert.equal(included.faceIds.length,working.faces.length);
-    assert.ok(included.mesh.faces.length>result.mesh.faces.length);
+    assert.equal(included.faceIds.length,Math.min(32,working.faces.length));
+    assert.ok(included.faceIds.length>=result.faceIds.length);
     manifold(result.mesh);rectangularBoundary(result.mesh,8,8);
   }
   assert.deepEqual(createMeshLayers(base,{initialDiamondDualEnabled:false}),createMeshLayers(base,{initialDiamondDualEnabled:false,excludeInitialBorderTriangles:false}));
+});
+
+test('chain limit caps actual extrusions, distributes them across the view, and rebuilds deterministically',()=>{
+  const base=createViewportMesh(12,8,10),options={subdivisionEnabled:false,diamondDualEnabled:false};
+  for(const maxChains of [1,8,16,32]){
+    const result=createMeshLayers(base,{...options,maxChains});assert.equal(result.binding.chains.length,maxChains);
+    manifold(result.mesh);rectangularBoundary(result.mesh,12,8);
+    assert.deepEqual(createMeshLayers(base,{...options,maxChains}).binding,result.binding);
+    if(maxChains>1){const roots=result.binding.chains.map(chain=>chain.centers[0]);assert.ok(Math.min(...roots.map(p=>p[0]))<-3&&Math.max(...roots.map(p=>p[0]))>3);}
+  }
+  assert.equal(createMeshLayers(base,options).binding.chains.length,32);
+  assert.throws(()=>createMeshLayers(base,{...options,maxChains:33}),/Maximum chains/);
+  assert.throws(()=>mergeMeshSetup(defaultMeshSetup(),{pipeline:{maxChains:0}}),/Maximum chains/);
 });
 
 test('triangulation and face-center dual report source faces for reliable border ancestry',()=>{

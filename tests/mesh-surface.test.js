@@ -40,10 +40,11 @@ test('polygon surface keeps one normal range per n-gon and updates live corner d
 });
 
 test('shaded surface and wireframe visibility are independent and shaded-only meshes remain pickable',()=>{
-  const view=createMeshView(new Scene()),camera=new PerspectiveCamera(42,1,.1,1000),settings=mergeMeshSetup(defaultMeshSetup(),{pipeline:{enabled:false}});
+  const view=createMeshView(new Scene()),camera=new PerspectiveCamera(42,1,.1,1000),settings=mergeMeshSetup(defaultMeshSetup(),{pipeline:{enabled:false},rig:{enabled:false}});
   camera.position.set(0,0,7);camera.lookAt(0,0,0);camera.updateMatrixWorld();
   try {
     view.configure(settings);view.regenerate(camera,settings);
+    camera.position.y=view.object.position.y;camera.lookAt(view.object.position);camera.updateMatrixWorld();
     assert.equal(view.surface.mesh.visible,true);assert.equal(view.object.material.visible,false);
     const ray=new Raycaster();ray.setFromCamera(new Vector2(.1,.1),camera);assert.ok(Number.isInteger(view.pickFace(ray)));
     view.configure(mergeMeshSetup(settings,{visibility:{surface:false,wireframe:true}}));assert.equal(view.surface.mesh.visible,false);assert.equal(view.object.material.visible,true);

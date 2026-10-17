@@ -3,14 +3,16 @@ import { silence } from '@strudel/core';
 import { createHammockVoices } from './hammock-voices.js';
 import { defaultMeshSetup } from './mesh-settings.js';
 import { instrumentLevel } from './instrument-settings.js';
+import { randomDragNote } from './drag-chaos.js';
 
 export function createMarchAudio({now=()=>performance.now()/1000,canPlay=()=>true,onStatus=()=>{},
   createContext=()=>new AudioContext(),createVoices=createHammockVoices,pattern=silence,
-  setTimer=callback=>setInterval(callback,25),clearTimer=id=>clearInterval(id)}={}) {
+  setTimer=callback=>setInterval(callback,25),clearTimer=id=>clearInterval(id),random=Math.random}={}) {
   const clock=createMarchClock({now});
   let settings=defaultMeshSetup().audio,context,voices,master,compressor,limiter,timer,cursor=0,scheduled=0;
   let disposed=false,playing=false,operation=0,usingAudioClock=false,resumeSustains=false,hasPlayed=false,graphFault=false;
   let visualEvents=[],section;
+  let dragging=false,chaosCursor=0,chaosSequence=0;
   const delivered=new Map();
   const active=()=>!disposed&&clock.running&&settings.enabled&&canPlay();
   function status(message){onStatus(message);}
@@ -36,6 +38,19 @@ export function createMarchAudio({now=()=>performance.now()/1000,canPlay=()=>tru
   function schedule(){
     if(!active()||context?.state!=='running'){stop();return;}
     try{
+      if(dragging&&settings.dragChaosEnabled){
+        const now=context.currentTime;chaosCursor=Math.max(chaosCursor,now+.004);
+        visualEvents=visualEvents.filter(event=>event.time>=now-.2);
+        for(let count=0;chaosCursor<now+.08&&count<12;count++){
+          const {value,duration}=randomDragNote(random),at=chaosCursor;
+          voices.trigger(value,at,duration,settings);scheduled++;
+          const group=['kick','snare','hat'].includes(value.layer)?'drums':value.layer;
+          if(settings.volume>0&&settings[group]>0&&instrumentLevel(settings,value.layer)>0)
+            visualEvents.push({...value,time:at,onset:++chaosSequence,beat:clock.beat,key:`chaos:${value.layer}:${value.note??'hit'}`});
+          chaosCursor+=(.5+random())/settings.dragChaosRate;
+        }
+        cursor=clock.beat;section='Drag improvisation';status(section);return;
+      }
       const beat=clock.beat,bps=settings.bpm/60,end=beat+.16*bps;
       visualEvents=visualEvents.filter(event=>event.time>=context.currentTime-.2);
       if(cursor<beat-.1*bps){cursor=beat;voices.stop();resumeSustains=true;} // Never replay a backlog after a stall.
@@ -49,12 +64,13 @@ export function createMarchAudio({now=()=>performance.now()/1000,canPlay=()=>tru
           (Number(hap.whole.end)*4-onset)/bps,settings);scheduled++;
         const value=hap.value,group=['kick','snare','hat'].includes(value.layer)?'drums':value.layer;
         if(!held&&settings.volume>0&&settings[group]>0&&instrumentLevel(settings,value.layer)>0&&value.gain>0){
-          const key=value.layer+':note',position=Number(hap.whole.begin);
+          const key=`${value.layer}:${value.note??value.s??'hit'}`,position=Number(hap.whole.begin);
           if(position>(delivered.get(key)??-1))visualEvents.push({...value,time:at,onset:position,beat:onset,key});
         }
       }
       cursor=end;resumeSustains=false;
-      const next='Strudel composition';
+      const currentSection=pattern.sectionAt?.(beat/4)?.name;
+      const next=[pattern.title??'Strudel composition',currentSection].filter(Boolean).join(' · ');
       if(next!==section){section=next;status(next);}
     }catch(error){stop();status(`Beat stopped: ${error.message}`);}
   }
@@ -85,14 +101,19 @@ export function createMarchAudio({now=()=>performance.now()/1000,canPlay=()=>tru
     if(previous&&previous.state!=='closed')previous.close().catch(()=>{});
   }
   return {retry,
+    setDragging(value){
+      const next=!!value;if(next===dragging)return;dragging=next;
+      voices?.stop();visualEvents=[];delivered.clear();cursor=clock.beat;chaosCursor=context?.currentTime??0;section=undefined;
+      if(playing)schedule();else if(dragging)void retry();
+    },
     setPattern(next = silence) {
       if (!next || typeof next.queryArc !== 'function') throw new Error('Expected a Strudel pattern.');
-      stop(); pattern = next; delivered.clear(); clock.restart();
+      dragging=false;stop(); pattern = next; delivered.clear(); clock.restart();
       if (pattern === silence) releaseContext();
       return retry();
     },
     configure(value){
-      const changed=['bpm','enabled','drums','bass','keys','melody'].some(key=>settings[key]!==value[key]);
+      const changed=['bpm','enabled','drums','bass','keys','melody','dragChaosEnabled'].some(key=>settings[key]!==value[key]);
       if(changed)stop();clock.setTempo(value.bpm);settings={...value};
       voices?.configure?.(settings);
       if(!settings.volume)visualEvents=[];
@@ -101,8 +122,8 @@ export function createMarchAudio({now=()=>performance.now()/1000,canPlay=()=>tru
       void retry();
     },
     play(){if(disposed)return;clock.play();void retry();},
-    pause(){clock.pause();stop();},
-    restart(){stop();clock.restart();scheduled=0;delivered.clear();void retry();},
+    pause(){dragging=false;clock.pause();stop();},
+    restart(){dragging=false;stop();clock.restart();scheduled=0;delivered.clear();void retry();},
     drainEvents(){
       if(!playing||context?.state!=='running')return [];
       const ready=[],now=context.currentTime;
@@ -118,7 +139,7 @@ export function createMarchAudio({now=()=>performance.now()/1000,canPlay=()=>tru
     get beat(){return clock.beat;},get playing(){return playing;},
     get audioTime(){return context?.currentTime;},
 
-    get diagnostics(){return {beat:clock.beat,bpm:clock.bpm,running:clock.running,playing,contextState:context?.state,scheduledEvents:scheduled,queuedEvents:visualEvents.length,activeVoices:voices?.activeVoices??0,instruments:voices?.diagnostics,section};},
+    get diagnostics(){return {beat:clock.beat,bpm:clock.bpm,running:clock.running,playing,dragging,chaos:dragging&&settings.dragChaosEnabled,contextState:context?.state,scheduledEvents:scheduled,queuedEvents:visualEvents.length,activeVoices:voices?.activeVoices??0,instruments:voices?.diagnostics,section};},
     dispose(){if(disposed)return;disposed=true;clock.pause();releaseContext();},
   };
 }

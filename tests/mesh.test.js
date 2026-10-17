@@ -33,10 +33,10 @@ test('n-sided boundaries close and shared edges draw only once, without triangul
   assert.ok(!edges.some(([a,b]) => a===0 && b===2));
 });
 
-test('resize regenerates geometry, disposes old buffers, and fits portrait and landscape views', () => {
+test('resize regenerates geometry, disposes old buffers, and keeps a closed dodecahedron in portrait and landscape views', () => {
   const camera=new PerspectiveCamera(42,1,0.1,1000),scene=new Scene(),view=createMeshView(scene);
   camera.position.set(0,0,7);camera.lookAt(0,0,0);camera.updateMatrixWorld();
-  const settings=defaultMeshSetup(); settings.pipeline.enabled=false;
+  const settings=defaultMeshSetup(); settings.pipeline.enabled=false; settings.rig.enabled=false;
   let disposed=0;
   for (const aspect of [16/9,9/16,1]) {
     const previous=view.object.geometry;
@@ -45,12 +45,14 @@ test('resize regenerates geometry, disposes old buffers, and fits portrait and l
     view.regenerate(camera,settings);
     assert.notEqual(previous,view.object.geometry);
     view.object.updateMatrixWorld();
-    const corner=new Vector3(...view.topology.vertices.at(-1)).applyMatrix4(view.object.matrixWorld).project(camera);
-    assert.ok(Math.abs(corner.x-1)<1e-10 && Math.abs(corner.y-1)<1e-10);
+    assert.equal(view.topology.faces.length,12);
+    assert.ok(view.topology.faces.every(face=>face.length===5));
+    assert.equal(view.object.quaternion.w,1);
   }
   assert.equal(disposed,3);assert.equal(view.generation,3);
-  view.regenerate(camera,mergeMeshSetup(settings,{mesh:{shortSideSubdivisions:8}}));
-  assert.equal(view.topology.faces.length,64);
+  view.regenerate(camera,mergeMeshSetup(settings,{mesh:{radius:3}}));
+  assert.equal(view.topology.faces.length,12);
+  assert.ok(view.topology.vertices.every(point=>Math.abs(new Vector3(...point).length()-3)<1e-8));
   view.dispose(); assert.equal(scene.children.length,0);
 });
 

@@ -8,6 +8,8 @@ import { extrudeFaces, extrusionTransform, triangulateFace } from '../src/mesh-o
 import { createMeshRig, initMeshRigPhysics } from '../src/mesh-rig.js';
 import { createMeshView } from '../src/mesh-view.js';
 import { defaultMeshSetup, mergeMeshSetup, validateMeshSetup } from '../src/mesh-settings.js';
+import { notePaletteForPattern } from '../src/chain-notes.js';
+import { createReferenceScore } from '../src/reference-score.js';
 
 await initMeshRigPhysics();
 const near=(a,b,tolerance=1e-5)=>assert.ok(Math.abs(a-b)<tolerance,`${a} != ${b}`);
@@ -99,7 +101,7 @@ test('real skinned mesh reproduces its bind pose even when its parent is rotated
       assert.equal(link.shape.getType(),'hull'); // Nonuniformly scaled capsule.
       assert.equal(link.debug.geometry.type,'CapsuleGeometry');
       assert.ok(Object.values(link.halfExtents).every(value=>value>0));
-      near(link.halfExtents.y,link.length/2);
+      near(link.halfExtents.y,(link.length+link.lowerInset+link.upperInset)/2);
     });
   }finally{item.dispose();}
 });
@@ -213,5 +215,166 @@ test('hover hits hidden moving colliders and accelerates them away from the curs
     rig.configure({hoverEnabled:false});rig.step(1/60);assert.equal(rig.hoveredCollider,null);
     rig.configure({hoverEnabled:true});rig.setHoverRay(null);rig.step(1/60);assert.equal(rig.hoveredCollider,null);
     const posed=rig.getPositions(),rest=item.mesh.vertices.flat();assert.ok(posed.every(Number.isFinite));assert.ok(posed.some((v,i)=>Math.abs(v-rest[i])>1e-6));
+  }finally{item.dispose();}
+});
+
+test('note scale accumulates down bones while physical hulls, joint anchors and fixed boundaries follow',()=>{
+  const item=createRig({pipeline:{minDepth:3,maxDepth:3},rig:{simulate:false,noteAttack:.025}}),{rig}=item;
+  try {
+    const rest=rig.getPositions();
+    rig.setNotePalette([{layer:'bass',note:'d1',midi:26},{layer:'keys',note:'e4',midi:64}]);
+    const chain=rig.chainNotes.ordered[0],originalHandles=chain.links.map(link=>link.shape);
+    assert.ok(rig.links.every(link=>link.currentScale===0&&!link.body.isEnabled()));
+    rig.triggerNotes([{layer:'bass',note:'d1',gain:1}]);rig.step(.025);
+    for(const [i,link] of chain.links.entries()) {
+      near(link.currentScale,1.2**(i+1),.00051);
+      const position=new Vector3(),rotation=new Quaternion(),scale=new Vector3();link.bone.matrix.decompose(position,rotation,scale);
+      near(scale.x,1.2,.001);near(scale.y,1.2,.001);near(scale.z,1.2,.001);
+      assert.ok(link.debug.scale.distanceTo(link.capsuleScale.clone().multiplyScalar(link.currentScale))<1e-6);
+      const bounds=link.shape.getAABB(),center=link.body.getPosition();
+      assert.ok(bounds.lowerBound.z<center.z&&bounds.upperBound.z>center.z);
+      assert.ok(originalHandles[i].isDeleted());
+    }
+    for(const joint of rig.joints) {
+      const a=new Vector3().copy(joint.bodyA.getWorldPoint(joint.localFrameA.position)),b=new Vector3().copy(joint.bodyB.getWorldPoint(joint.localFrameB.position));
+      near(a.distanceTo(b),0,1e-5);
+    }
+    const posed=rig.getPositions();assert.ok(posed.some((v,i)=>Math.abs(v-rest[i])>.1));
+    item.binding.weights.forEach((weights,id)=>{if(weights.length===1&&weights[0][0]===0)for(let axis=0;axis<3;axis++)near(posed[id*3+axis],rest[id*3+axis],1e-6);});
+    rig.configure({noteScaleEnabled:false});assert.ok(rig.links.every(link=>link.currentScale===1));
+    rig.getPositions().forEach((value,i)=>near(value,rest[i],1e-6));
+  } finally {item.dispose();}
+});
+
+test('long chains collapse completely, remain attached while tiny, and regrow with valid colliders',()=>{
+  const item=createRig({pipeline:{minDepth:8,maxDepth:8,segmentLength:.01},rig:{gravity:15.2,coneAngle:10,noteAttack:.02,noteRelease:.05}}),{rig}=item;
+  try {
+    const roots=rig.chains.map(chain=>({...chain.root.getPosition()})),rest=rig.getPositions();
+    rig.setNotePalette([{layer:'bass',note:'d1',midi:26}]);
+    assert.ok(rig.links.every(link=>link.currentScale===0&&!link.body.isEnabled()));
+    for(let pulse=0;pulse<3;pulse++) {
+      rig.triggerNotes([{layer:'bass',note:'d1',gain:1}]);rig.step(.02);
+      assert.ok(rig.links.every(link=>link.currentScale>=1&&link.body.isEnabled()));
+      for(let frame=0;frame<60;frame++) {
+        rig.step(1/120);
+        assert.ok(rig.getPositions().every(Number.isFinite));
+        for(const joint of rig.joints) {
+          const a=new Vector3().copy(joint.bodyA.getWorldPoint(joint.localFrameA.position)),b=new Vector3().copy(joint.bodyB.getWorldPoint(joint.localFrameB.position));
+          assert.ok(a.distanceTo(b)/rig.physicsScale<.02);
+        }
+      }
+      assert.ok(rig.links.every(link=>link.currentScale===0&&!link.body.isEnabled()&&!link.debug.visible));
+      assert.ok(rig.links.every(link=>link.body.getShapeCount()===1&&link.body.getMass()>0));
+      for(const chain of rig.chains)for(const link of chain.links) {
+        assert.ok(new Vector3().setFromMatrixPosition(link.bone.matrixWorld).distanceTo(new Vector3(...chain.definition.centers[0]))<1e-6);
+        near(link.bone.matrixWorld.determinant(),0);
+      }
+      const ray=new Raycaster(new Vector3(...rig.chains[0].definition.centers[0]).add(new Vector3(0,0,10)),new Vector3(0,0,-1));
+      assert.equal(rig.pickCollider(ray),null,'collapsed bodies cannot be hovered');
+    }
+    rig.chains.forEach((chain,i)=>assert.deepEqual(chain.root.getPosition(),roots[i]));
+    const positions=rig.getPositions();
+    item.binding.weights.forEach((weights,id)=>{if(weights.length===1&&weights[0][0]===0)for(let axis=0;axis<3;axis++)near(positions[id*3+axis],rest[id*3+axis],1e-6);});
+    rig.configure({noteScaleEnabled:false});assert.ok(rig.links.every(link=>link.currentScale===1&&link.body.isEnabled()));
+    assert.ok(rig.getPositions().every(Number.isFinite));
+  }finally{item.dispose();}
+});
+
+test('minimum and maximum bone scales accumulate through the skeleton and resize its colliders',()=>{
+  const item=createRig({pipeline:{minDepth:3,maxDepth:3},rig:{simulate:false,noteAttack:.025,noteRelease:.05,noteScaleMin:.4,noteScaleMax:.8}}),{rig}=item;
+  try {
+    rig.setNotePalette([{layer:'bass',note:'d1',midi:26}]);
+    const checkScale=value=>{
+      for(const chain of rig.chains)for(const [i,link] of chain.links.entries()) {
+        near(link.currentScale,value**(i+1),.00051);
+        assert.ok(link.debug.scale.distanceTo(link.capsuleScale.clone().multiplyScalar(link.currentScale))<1e-6);
+        near(link.shapeScale,link.currentScale);
+        assert.equal(link.body.isEnabled(),true);
+      }
+      assert.ok(rig.getPositions().every(Number.isFinite));
+    };
+    checkScale(.4);
+    rig.triggerNotes([{layer:'bass',note:'d1',gain:1}]);rig.step(.025);checkScale(.8);
+    for(let i=0;i<20;i++)rig.step(.05);checkScale(.4);
+    rig.configure({noteScaleMin:.5,noteScaleMax:.5});checkScale(.5);
+  }finally{item.dispose();}
+});
+
+test('repeated musical pulses remain finite under physics and keep roots anchored',()=>{
+  const item=createRig({pipeline:{minDepth:3,maxDepth:3},rig:{gravity:4,coneAngle:25}}),{rig}=item;
+  try {
+    rig.setNotePalette(notePaletteForPattern(createReferenceScore()));
+    const roots=rig.chains.map(chain=>({...chain.root.getPosition()}));
+    for(let i=0;i<180;i++) {
+      if(i%20===0)rig.triggerNotes([{layer:'bass',note:'d1',gain:.8},{layer:'keys',note:'e4',gain:.6},{layer:'snare',gain:.8}]);
+      rig.step(1/60);
+    }
+    assert.ok(rig.getPositions().every(Number.isFinite));
+    rig.chains.forEach((chain,i)=>assert.deepEqual(chain.root.getPosition(),roots[i]));
+    assert.ok(rig.links.every(link=>link.body.getShapeCount()===1));
+    for(const joint of rig.joints) {
+      const a=new Vector3().copy(joint.bodyA.getWorldPoint(joint.localFrameA.position)),b=new Vector3().copy(joint.bodyB.getWorldPoint(joint.localFrameB.position));
+      assert.ok(a.distanceTo(b)<.02);
+    }
+  }finally{item.dispose();}
+});
+
+test('note pushes move the actual bones with scaling disabled while keeping roots and boundaries fixed',()=>{
+  const settings={gravity:0,noteScaleEnabled:false,linearDamping:1,angularDamping:1};
+  const moving=createRig({rig:{...settings,notePushStrength:4}}),still=createRig({rig:{...settings,notePushStrength:0}});
+  try {
+    const palette=notePaletteForPattern(createReferenceScore()),rest=moving.rig.getPositions();
+    const roots=moving.rig.chains.map(chain=>({...chain.root.getPosition()}));
+    for(const item of [moving,still]){
+      item.rig.setNotePalette(palette);item.rig.triggerNotes([{layer:'bass',note:'d2',gain:.8}]);
+      for(let i=0;i<20;i++)item.rig.step(1/60);
+    }
+    const motion=item=>item.rig.getPositions().reduce((sum,value,i)=>sum+(value-rest[i])**2,0);
+    assert.ok(motion(moving)>motion(still)+.01,'note impulses deform the skin even without a scale pulse or gravity');
+    assert.ok(moving.rig.links.every(link=>link.currentScale===1));
+    moving.rig.chains.forEach((chain,i)=>assert.deepEqual(chain.root.getPosition(),roots[i]));
+    const positions=moving.rig.getPositions();assert.ok(positions.every(Number.isFinite));
+    moving.binding.weights.forEach((weights,id)=>{if(weights.length===1&&weights[0][0]===0)for(let axis=0;axis<3;axis++)near(positions[id*3+axis],rest[id*3+axis],1e-6);});
+  }finally{moving.dispose();still.dispose();}
+});
+
+test('note impulses wait for collapsed colliders to grow, lift in world space, and fire only once per hit',()=>{
+  const item=createRig({pipeline:{minDepth:3,maxDepth:3},rig:{gravity:0,noteAttack:.5,notePushStrength:4}}),{rig}=item;
+  try {
+    rig.setNotePalette([{layer:'bass',note:'d1',midi:26}]);
+    const pushes=[],worldRotation=new Quaternion().setFromAxisAngle(new Vector3(1,0,0),-.7);
+    for(const link of rig.links){
+      const apply=link.body.applyLinearImpulseToCenter.bind(link.body);
+      link.body.applyLinearImpulseToCenter=(impulse,wake)=>{
+        pushes.push({link,enabled:link.physicsEnabled,velocity:new Vector3().copy(impulse).divideScalar(link.body.getMass()).applyQuaternion(worldRotation)});
+        apply(impulse,wake);
+      };
+    }
+    rig.triggerNotes([{layer:'bass',note:'d1',gain:.6}]);rig.step(1/60,worldRotation);
+    assert.equal(pushes.length,0,'fully collapsed bodies are not pushed before they have valid hulls');
+    for(let i=0;i<40;i++)rig.step(1/60,worldRotation);
+    assert.equal(pushes.length,rig.links.length);
+    assert.equal(new Set(pushes.map(push=>push.link)).size,rig.links.length);
+    assert.ok(pushes.every(push=>push.enabled&&push.velocity.y>0&&push.velocity.length()>1&&push.velocity.length()<=2.40001));
+    assert.ok(rig.getPositions().every(Number.isFinite));
+    rig.triggerNotes([{layer:'bass',note:'d1',gain:.6}]);rig.configure({notePushEnabled:false});
+    rig.step(1/60,worldRotation);assert.equal(pushes.length,rig.links.length,'disabling pushes clears pending impulses');
+    rig.configure({notePushEnabled:true});rig.step(1/60,worldRotation);assert.equal(pushes.length,rig.links.length);
+  }finally{item.dispose();}
+});
+
+test('drag spring pulls a collider toward a world-space target while holding the root, then releases cleanly',()=>{
+  const item=createRig({pipeline:{minDepth:3,maxDepth:3},rig:{gravity:0,noteScaleEnabled:false,notePushEnabled:false}}),{rig}=item;
+  try {
+    const host=new Group();host.rotation.set(.3,-.2,.1);host.position.set(2,-1,0);host.add(rig.group);host.updateMatrixWorld(true);
+    const chain=rig.chains[0],link=chain.links.at(-1),root={...chain.root.getPosition()};
+    const center=()=>new Vector3().copy(link.body.getPosition()).divideScalar(rig.physicsScale).applyMatrix4(rig.group.matrixWorld);
+    const start=center(),target=start.clone().add(new Vector3(.65,.3,0));
+    assert.equal(rig.beginDrag(link,start),true);rig.moveDrag(target);
+    for(let i=0;i<60;i++)rig.step(1/60);
+    assert.ok(center().distanceTo(target)<start.distanceTo(target)*.6);
+    assert.deepEqual(chain.root.getPosition(),root);assert.ok(rig.getPositions().every(Number.isFinite));
+    assert.equal(rig.dragging,true);rig.endDrag();assert.equal(rig.dragging,false);
+    rig.configure({simulate:false});assert.equal(rig.beginDrag(link,center()),false);
   }finally{item.dispose();}
 });
