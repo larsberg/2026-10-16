@@ -2,12 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PerspectiveCamera, Scene, Vector3 } from 'three';
 import { createViewportMesh, polygonEdges } from '../src/polygon-mesh.js';
-import { createMeshLayers, createSeededRandom } from '../src/mesh-layers.js';
+import { createMeshLayers as buildMeshLayers, createSeededRandom } from '../src/mesh-layers.js';
 import { averageVertices, dualDiamond, extrudeFaces, extrusionTransform, dualNSided, faceFrame, triangulateFace, triangulateFaces, validatePolygonMesh } from '../src/mesh-operations.js';
 import { createMeshView } from '../src/mesh-view.js';
+import { initMeshRigPhysics } from '../src/mesh-rig.js';
 import { defaultMeshSetup, mergeMeshSetup, validateMeshSetup } from '../src/mesh-settings.js';
 
 const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-9,`${a} != ${b}`);
+// Isolate the original stages unless a test explicitly enables Hexelate.
+const createMeshLayers=(base,options)=>buildMeshLayers(base,{hexelateTriangulateEnabled:false,hexelateEnabled:false,finalAverageVerticesEnabled:false,...options});
+await initMeshRigPhysics();
 function manifold(mesh) {
   validatePolygonMesh(mesh);
   const edges=new Map();
@@ -75,8 +79,8 @@ test('layer order insets every dual face to 0.5, raises it 1–3 units, and reta
   assert.equal(result.stages[1].faces,base.vertices.length);
   assert.equal(result.faceIds.length,dual.faces.length);
   assert.equal(result.stages[2].selected,dual.faces.length);
-  const edgeSides=dual.faces.reduce((sum,f)=>sum+f.length,0);
-  assert.equal(result.mesh.faces.length,dual.faces.length+edgeSides*4);
+  const sideFaces=dual.faces.reduce((sum,f,i)=>sum+f.length*(1+Math.max(1,Math.floor(result.depths[i].depth))),0);
+  assert.equal(result.mesh.faces.length,dual.faces.length+sideFaces);
   assert.equal(new Set(result.faceIds).size,dual.faces.length);
   for(let i=0;i<dual.faces.length;i++) {
     const original=dual.faces[i],frame=faceFrame(dual,original),cap=result.mesh.faces[result.faceIds[i]],depth=result.depths[i].depth;
@@ -99,12 +103,12 @@ test('layering retains valid boundaries on square, portrait, and landscape grids
   }
 });
 
-test('resize rebuilds the final diamond dual and clears manual edit history and selection',()=>{
+test('resize rebuilds the final Hexelate dual and clears manual edit history and selection',()=>{
   const view=createMeshView(new Scene()),camera=new PerspectiveCamera(42,1,.1,1000),settings=defaultMeshSetup();
   camera.position.set(0,0,7);camera.lookAt(0,0,0);camera.updateMatrixWorld();
   view.regenerate(camera,settings);const original=structuredClone(view.topology),selection=view.selectedFaces;
-  assert.equal(view.layers.stages.length,8);assert.equal(selection.length,0);
-  assert.equal(view.layers.stages.at(-1).name,'Diamond dual');
+  assert.equal(view.layers.stages.length,11);assert.equal(selection.length,0);
+  assert.equal(view.layers.stages.at(-1).name,'Final average vertices · fixed boundary');
   view.extrude([0],extrusionTransform({depth:.2}));assert.equal(view.canUndo,true);
   view.regenerate(camera,settings);assert.equal(view.canUndo,false);assert.deepEqual(view.topology,original);assert.deepEqual(view.selectedFaces,selection);
   camera.aspect=.6;camera.updateProjectionMatrix();view.regenerate(camera,settings);
@@ -120,7 +124,7 @@ test('layer controls roundtrip, validate depth bounds, and migrate old saves',()
   const previous=structuredClone(defaults);delete previous.pipeline.subdivisionEnabled;delete previous.pipeline.subdivisionIterations;delete previous.pipeline.diamondDualEnabled;delete previous.pipeline.initialDiamondDualEnabled;
   for(const key of ['triangulateEnabled','faceCenterDualEnabled','insetEnabled','extrusionEnabled'])delete previous.pipeline[key];
   delete previous.pipeline.excludeInitialBorderTriangles;
-  delete previous.pipeline.averageVerticesEnabled;
+  delete previous.pipeline.averageVerticesEnabled;delete previous.pipeline.hexelateEnabled;delete previous.pipeline.hexelateTriangulateEnabled;delete previous.pipeline.finalAverageVerticesEnabled;delete previous.pipeline.segmentLength;
   assert.deepEqual(validateMeshSetup(previous).pipeline,defaults.pipeline);
   assert.equal(defaults.pipeline.diamondDualEnabled,true);
   assert.equal(defaults.pipeline.initialDiamondDualEnabled,true);
@@ -130,9 +134,13 @@ test('layer controls roundtrip, validate depth bounds, and migrate old saves',()
   const saved=mergeMeshSetup(defaults,{pipeline:{seed:123,insetScale:.75,minDepth:1,maxDepth:3,segments:3}});
   assert.deepEqual(validateMeshSetup(saved),saved);
   assert.throws(()=>mergeMeshSetup(defaults,{pipeline:{minDepth:4,maxDepth:3}}),/Maximum depth/);
-  assert.throws(()=>mergeMeshSetup(defaults,{pipeline:{segments:2.5}}),/Extrusion segments/);
+  assert.equal(validateMeshSetup({...defaults,pipeline:{...defaults.pipeline,segments:3}}).pipeline.segments,undefined);
+  assert.equal(mergeMeshSetup(defaults,{pipeline:{finalAverageVerticesEnabled:false}}).pipeline.finalAverageVerticesEnabled,false);
+  assert.throws(()=>mergeMeshSetup(defaults,{pipeline:{finalAverageVerticesEnabled:'false'}}),/Average vertices after Hexelate/);
   assert.throws(()=>mergeMeshSetup(defaults,{pipeline:{subdivisionIterations:1.5}}),/Subdivision passes/);
   assert.throws(()=>createMeshLayers(createViewportMesh(4,4,2),{insetScale:1}),/Inset scale/);
+  for(const segmentLength of [0,.009,1.01,NaN])assert.throws(()=>mergeMeshSetup(defaults,{pipeline:{segmentLength}}),/length per segment/);
+  assert.equal(validateMeshSetup(previous).pipeline.segmentLength,1);
 });
 
 test('diamond dual is applied to the smoothed surface as the final layer',()=>{
@@ -148,6 +156,43 @@ test('diamond dual is applied to the smoothed surface as the final layer',()=>{
   for(const position of smooth.mesh.vertices)assert.ok(result.mesh.vertices.some(v=>v.every((value,axis)=>value===position[axis])));
   assert.deepEqual(base,before);manifold(result.mesh);
   assert.deepEqual(result,createMeshLayers(base));
+});
+
+test('Hexelate applies the face-center dual last and remaps the existing bone weights',()=>{
+  const base=createViewportMesh(8,8,4),previous=createMeshLayers(base),result=createMeshLayers(base,{hexelateEnabled:true});
+  assert.deepEqual(result.mesh,dualNSided(previous.mesh).mesh);
+  assert.deepEqual(result.stages.slice(0,-1),previous.stages);
+  assert.equal(result.stages.at(-1).name,'Hexelate · face-center dual');assert.equal(result.stages.length,9);
+  assert.ok(result.mesh.faces.some(face=>face.length>=5));assert.deepEqual(result.faceIds,[]);
+  assert.deepEqual(result.binding.chains,previous.binding.chains);assert.equal(result.binding.weights.length,result.mesh.vertices.length);
+  for(const weights of result.binding.weights){near(weights.reduce((sum,[,weight])=>sum+weight,0),1);assert.ok(weights.length<=4);}
+  manifold(result.mesh);rectangularBoundary(result.mesh,8,8);
+});
+
+test('triangulation before Hexelate creates polygon cells with or without the preceding diamond',()=>{
+  for(const diamondDualEnabled of [false,true])for(const [width,height] of [[8,8],[5,12],[12,5]]) {
+    const base=createViewportMesh(width,height,4),before=structuredClone(base);
+    const options={diamondDualEnabled,hexelateTriangulateEnabled:true};
+    const triangles=createMeshLayers(base,options),result=createMeshLayers(base,{...options,hexelateEnabled:true});
+    assert.ok(triangles.mesh.faces.every(face=>face.length===3));
+    assert.equal(triangles.stages.at(-1).name,'Triangulate before Hexelate');
+    assert.deepEqual(result.mesh,dualNSided(triangles.mesh).mesh);
+    const cells=result.mesh.faces.filter(face=>face.length>=5&&face.length<=7);
+    assert.ok(cells.length/result.mesh.faces.length>.7,'most cells should have five to seven sides');
+    assert.ok(result.mesh.faces.filter(f=>f.length===6).length>result.mesh.faces.filter(f=>f.length===4).length);
+    assert.deepEqual(result.binding.chains,triangles.binding.chains);
+    assert.equal(result.binding.weights.length,result.mesh.vertices.length);
+    assert.deepEqual(result.faceIds,[]);assert.deepEqual(result.depths,[]);
+    manifold(result.mesh);rectangularBoundary(result.mesh,width,height);assert.deepEqual(base,before);
+    assert.deepEqual(result,createMeshLayers(base,{...options,hexelateEnabled:true}));
+  }
+});
+
+test('folded Hexelate cells from coincident independent extrusion walls fail without mutating the base',()=>{
+  const base=createViewportMesh(4,4,2),before=structuredClone(base);
+  assert.throws(()=>createMeshLayers(base,{seed:7,initialDiamondDualEnabled:false,faceCenterDualEnabled:false,averageVerticesEnabled:false,
+    insetEnabled:false,subdivisionEnabled:false,diamondDualEnabled:false,hexelateTriangulateEnabled:true,hexelateEnabled:true}),/Hexelate produced a folded polygon/);
+  assert.deepEqual(base,before);
 });
 
 test('initial diamond dual keeps border triangles and original corners before the remaining layers',()=>{
@@ -171,7 +216,7 @@ test('initial diamond dual keeps border triangles and original corners before th
   }
 });
 
-const passKeys=['initialDiamondDualEnabled','triangulateEnabled','faceCenterDualEnabled','averageVerticesEnabled','insetEnabled','extrusionEnabled','subdivisionEnabled','diamondDualEnabled'];
+const passKeys=['initialDiamondDualEnabled','triangulateEnabled','faceCenterDualEnabled','averageVerticesEnabled','insetEnabled','extrusionEnabled','subdivisionEnabled','diamondDualEnabled','hexelateTriangulateEnabled','hexelateEnabled'];
 function rectangularBoundary(mesh,width,height) {
   const edges=new Map();
   for(const face of mesh.faces)face.forEach((a,i)=>{const b=face[(i+1)%face.length],key=a<b?`${a}:${b}`:`${b}:${a}`,list=edges.get(key)??[];list.push([a,b]);edges.set(key,list);});
@@ -185,11 +230,17 @@ function rectangularBoundary(mesh,width,height) {
   near(length,2*(width+height));
 }
 
-test('every pass toggles independently while keeping the entire original boundary',()=>{
+test('every pass toggles independently, retaining the boundary or rejecting folded cells',()=>{
   const base=createViewportMesh(4,4,2);
   for(let mask=0;mask<2**passKeys.length;mask++) {
     const options=Object.fromEntries(passKeys.map((key,i)=>[key,!!(mask&(1<<i))]));
-    const result=createMeshLayers(base,{seed:7,...options});
+    let result;
+    try { result=createMeshLayers(base,{seed:7,...options}); }
+    catch(error) {
+      assert.match(error.message,/(Hexelate|Diamond dual) produced a folded polygon/);
+      assert.ok((options.hexelateEnabled||options.diamondDualEnabled)&&options.extrusionEnabled&&!options.insetEnabled);
+      continue;
+    }
     assert.equal(result.stages.length,passKeys.filter(key=>options[key]).length,JSON.stringify(options));
     manifold(result.mesh);rectangularBoundary(result.mesh,4,4);
     assert.ok(result.depths.every(sample=>Number.isFinite(sample.depth)));
@@ -227,7 +278,7 @@ test('original diamond border triangles and their dual cells are kept out of ins
       const positions=JSON.stringify(polygonPositions(working,working.faces[id]));
       assert.ok(result.mesh.faces.some(face=>JSON.stringify(polygonPositions(result.mesh,face))===positions));
     }
-    for(const id of result.faceIds)for(const position of polygonPositions(result.mesh,result.mesh.faces[id]))assert.ok(position[2]>=1&&position[2]<=3);
+    for(const id of result.faceIds)for(const position of polygonPositions(result.mesh,result.mesh.faces[id]))assert.ok(position[2]>=1-1e-9&&position[2]<=3+1e-9);
     const included=createMeshLayers(base,{...options,excludeInitialBorderTriangles:false});
     assert.equal(included.faceIds.length,working.faces.length);
     assert.ok(included.mesh.faces.length>result.mesh.faces.length);

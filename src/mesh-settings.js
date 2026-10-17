@@ -7,7 +7,7 @@ import { defaultInstruments, validateInstruments, mergeInstruments } from './ins
 
 export const meshFields = {
   mesh: [
-    ['shortSideSubdivisions', 'Short side subdivisions', 4, 1, 64, 1],
+    ['shortSideSubdivisions', 'Short side subdivisions', 4, 3, 16, 1],
   ],
   pipeline: [
     ['enabled', 'Apply operation layers', true],
@@ -20,15 +20,33 @@ export const meshFields = {
     ['insetScale', 'Inset scale', 0.5, 0.01, 0.99, 0.01],
     ['extrusionEnabled', '6 · Random extrusion', true],
     ['excludeInitialBorderTriangles', 'Exclude initial border triangles from inset / extrusion', true],
-    ['minDepth', 'Minimum depth', 1, 0.01, 10, 0.01],
-    ['maxDepth', 'Maximum depth', 3, 0.01, 10, 0.01],
-    ['segments', 'Extrusion segments', 3, 1, 10, 1],
+    ['minDepth', 'Minimum extrusion amount', 1, 0.01, 10, 0.01],
+    ['maxDepth', 'Maximum extrusion amount', 3, 0.01, 10, 0.01],
+    ['segmentLength', 'Extrusion length per segment', 1, 0.01, 1, 0.01],
     ['subdivisionEnabled', '7 · Subdivide & smooth (fixed boundary)', true],
     ['subdivisionIterations', 'Subdivision passes', 1, 1, 3, 1],
     ['diamondDualEnabled', '8 · Diamond dual after smoothing', true],
+    ['hexelateTriangulateEnabled', '9 · Triangulate before Hexelate', true],
+    ['hexelateEnabled', '10 · Hexelate (face-center dual)', true],
+    ['finalAverageVerticesEnabled', '11 · Average vertices after Hexelate (fixed boundary)', true],
   ],
   editing: [
     ['selectedOnly', 'Only selected faces', true],
+  ],
+  rig: [
+    ['enabled', 'Bind mesh to extrusion bones', true],
+    ['simulate', 'Simulate bone chains', true],
+    ['gravity', 'Gravity', 0, 0, 20, 0.1],
+    ['coneAngle', 'Joint cone angle °', 60, 1, 120, 1],
+    ['twistAngle', 'Joint twist limit °', 90, 0, 180, 1],
+    ['linearDamping', 'Linear damping', 1, 0, 20, 0.01],
+    ['angularDamping', 'Angular damping', 1, 0, 20, 0.01],
+    ['hoverEnabled', 'Repel colliders on hover', true],
+    ['hoverAcceleration', 'Hover acceleration', 14, 0, 100, 0.1],
+    ['density', 'Collider density', 1, 0.1, 10, 0.1],
+    ['showBones', 'Show bones', true],
+    ['showJoints', 'Show joints', false],
+    ['showColliders', 'Show colliders', false],
   ],
   extrusion: [
     ['offsetX', 'Move X', 0, -10, 10, 0.01],
@@ -83,7 +101,8 @@ export const meshFields = {
     ['fov', 'Field of view °', 42, 20, 80, 0.1],
   ],
   visibility: [
-    ['wireframe', 'Mesh wireframe', true],
+    ['surface', 'Mesh surface', true],
+    ['wireframe', 'Mesh wireframe', false],
     ['ground', 'Ground plane', false],
     ['fps', 'Show frame-rate meter', false],
     ['text', 'Text prop', false],
@@ -95,7 +114,7 @@ export function defaultMeshSetup() {
   lighting.environment.backgroundColor = '#000000';
   Object.assign(lighting.directional, { enabled: true, color: '#ffd5bc', intensity: 2.6, height: 7, offsetZ: 4, softness: 3, shadowBias: -0.0003 });
   Object.assign(lighting.hemisphere, { skyColor: '#8bc7ff', groundColor: '#51303b', intensity: 0.7 });
-  // Wireframe has no opaque surface to shade. Keep the shared studio controls available.
+  // Keep occlusion optional; surface lighting and studio reflections are active.
   lighting.occlusion.enabled = false;
   const text = (content, align = 'left', heading = false) => ({ type: 'doc', content: [{ type: heading ? 'heading' : 'paragraph', attrs: { textAlign: align, ...(heading ? { level: 1 } : {}) }, content: [{ type: 'text', text: content }] }] });
   const result = { version: 1, sketch: '2026-10-16', materials: defaultMaterials(), lighting,
@@ -110,12 +129,22 @@ export function validateMeshSetup(value) {
   if (value?.version !== 1 || value?.sketch !== '2026-10-16') throw new Error('Expected a 2026-10-16 setup (version 1).');
   const result = defaultMeshSetup();
   // Existing version-1 saves acquire only the new operation-control defaults.
-  value = { ...value, pipeline: value.pipeline === undefined ? result.pipeline : value.pipeline, editing: value.editing === undefined ? result.editing : value.editing, extrusion: value.extrusion === undefined ? result.extrusion : value.extrusion };
+  value = { ...value, rig: value.rig === undefined ? result.rig : value.rig, pipeline: value.pipeline === undefined ? result.pipeline : value.pipeline, editing: value.editing === undefined ? result.editing : value.editing, extrusion: value.extrusion === undefined ? result.extrusion : value.extrusion };
+  if (value.rig && typeof value.rig === 'object') value.rig = { ...value.rig,
+    linearDamping: value.rig.linearDamping === undefined ? value.rig.damping ?? result.rig.linearDamping : value.rig.linearDamping,
+    angularDamping: value.rig.angularDamping === undefined ? value.rig.damping ?? result.rig.angularDamping : value.rig.angularDamping,
+    hoverEnabled: value.rig.hoverEnabled === undefined ? result.rig.hoverEnabled : value.rig.hoverEnabled,
+    hoverAcceleration: value.rig.hoverAcceleration === undefined ? result.rig.hoverAcceleration : value.rig.hoverAcceleration };
+  if (value.visibility && value.visibility.surface === undefined) value.visibility = { ...value.visibility, surface: result.visibility.surface };
   if (value.pipeline && typeof value.pipeline === 'object') value.pipeline = {
     ...value.pipeline,
     subdivisionEnabled: value.pipeline.subdivisionEnabled === undefined ? result.pipeline.subdivisionEnabled : value.pipeline.subdivisionEnabled,
     subdivisionIterations: value.pipeline.subdivisionIterations === undefined ? result.pipeline.subdivisionIterations : value.pipeline.subdivisionIterations,
     diamondDualEnabled: value.pipeline.diamondDualEnabled === undefined ? result.pipeline.diamondDualEnabled : value.pipeline.diamondDualEnabled,
+    hexelateEnabled: value.pipeline.hexelateEnabled === undefined ? result.pipeline.hexelateEnabled : value.pipeline.hexelateEnabled,
+    hexelateTriangulateEnabled: value.pipeline.hexelateTriangulateEnabled === undefined ? result.pipeline.hexelateTriangulateEnabled : value.pipeline.hexelateTriangulateEnabled,
+    finalAverageVerticesEnabled: value.pipeline.finalAverageVerticesEnabled === undefined ? result.pipeline.finalAverageVerticesEnabled : value.pipeline.finalAverageVerticesEnabled,
+    segmentLength: value.pipeline.segmentLength === undefined ? result.pipeline.segmentLength : value.pipeline.segmentLength,
     initialDiamondDualEnabled: value.pipeline.initialDiamondDualEnabled === undefined ? result.pipeline.initialDiamondDualEnabled : value.pipeline.initialDiamondDualEnabled,
     triangulateEnabled: value.pipeline.triangulateEnabled === undefined ? result.pipeline.triangulateEnabled : value.pipeline.triangulateEnabled,
     faceCenterDualEnabled: value.pipeline.faceCenterDualEnabled === undefined ? result.pipeline.faceCenterDualEnabled : value.pipeline.faceCenterDualEnabled,

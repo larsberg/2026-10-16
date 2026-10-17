@@ -15,7 +15,21 @@ export function configureSceneFog(scene, { enabled, color, near, far }) {
 
 // AO depth contains the opaque surfaces on layer 1. Transparent info, guides,
 // bones, and joints stay out of it. Beauty rendering keeps every layer.
-class SurfaceGTAOPass extends GTAOPass {
+export class SurfaceGTAOPass extends GTAOPass {
+  _overrideVisibility() {
+    // Hiding a LineSegments parent also hides its solid mesh children. Use
+    // the AO layer mask to exclude guides without hiding their descendants.
+    this.guideLayers = [];
+    this.scene.traverse(object => {
+      if (object.isPoints || object.isLine || object.isLine2) {
+        this.guideLayers.push([object, object.layers.mask]); object.layers.disable(1);
+      }
+    });
+  }
+  _restoreVisibility() {
+    for (const [object, mask] of this.guideLayers) object.layers.mask = mask;
+    this.guideLayers.length = 0;
+  }
   // Keep beauty and text sharp; occlusion is a soft, half-resolution signal.
   setSize(width, height) {
     super.setSize(Math.max(1, Math.ceil(width / 2)), Math.max(1, Math.ceil(height / 2)));

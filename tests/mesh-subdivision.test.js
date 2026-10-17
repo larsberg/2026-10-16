@@ -79,7 +79,7 @@ test('n-sided faces become quads and cap selection propagates through multiple p
 });
 
 test('final smoothing layer preserves the complete mesh outline and only selects refined cap descendants',()=>{
-  const base=createViewportMesh(10,8,4),raw=createMeshLayers(base,{subdivisionEnabled:false,diamondDualEnabled:false}),smooth=createMeshLayers(base,{diamondDualEnabled:false});
+  const base=createViewportMesh(10,8,4),raw=createMeshLayers(base,{subdivisionEnabled:false,diamondDualEnabled:false,hexelateTriangulateEnabled:false,hexelateEnabled:false,finalAverageVerticesEnabled:false}),smooth=createMeshLayers(base,{diamondDualEnabled:false,hexelateTriangulateEnabled:false,hexelateEnabled:false,finalAverageVerticesEnabled:false});
   assert.equal(smooth.stages.at(-1).name,'Subdivide & smooth · fixed boundary');
   assert.equal(smooth.mesh.faces.length,raw.mesh.faces.reduce((sum,face)=>sum+face.length,0));
   const expected=subdivideSmooth(raw.mesh,raw.faceIds);

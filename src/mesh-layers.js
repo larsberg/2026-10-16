@@ -1,4 +1,5 @@
-import { averageVertices, dualDiamond, dualNSided, extrudeFaces, extrusionTransform, insetFaces, subdivideSmooth, triangulateFaces } from './mesh-operations.js';
+import { averageVertices, dualDiamond, dualNSided, extrudeFaces, extrusionTransform, insetFaces, subdivideSmooth, triangulateFace, triangulateFaces, validatePolygonMesh } from './mesh-operations.js';
+import { createExtrusionBinding, refineBinding } from './mesh-binding.js';
 
 export function createSeededRandom(seed) {
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) throw new Error('Random seed must be an unsigned 32-bit integer.');
@@ -11,14 +12,19 @@ export function createSeededRandom(seed) {
   };
 }
 
-export function createMeshLayers(base, { enabled = true, seed = 1, insetScale = 0.5, minDepth = 1, maxDepth = 3, segments = 3,
+export function createMeshLayers(base, { enabled = true, seed = 1, insetScale = 0.5, minDepth = 1, maxDepth = 3, segmentLength = 1,
   initialDiamondDualEnabled = true, triangulateEnabled = true, faceCenterDualEnabled = true, averageVerticesEnabled = true, insetEnabled = true, extrusionEnabled = true,
-  subdivisionEnabled = true, subdivisionIterations = 1, diamondDualEnabled = true, excludeInitialBorderTriangles = true } = {}) {
-  if (!enabled) return { mesh: base, faceIds: [], stages: [], depths: [] };
+  subdivisionEnabled = true, subdivisionIterations = 1, diamondDualEnabled = true, hexelateTriangulateEnabled = true, hexelateEnabled = true, finalAverageVerticesEnabled = true, excludeInitialBorderTriangles = true } = {}) {
+  if (!enabled) return { mesh: base, faceIds: [], stages: [], depths: [], binding: createExtrusionBinding(base) };
   if (!Number.isFinite(insetScale) || insetScale <= 0 || insetScale >= 1) throw new Error('Inset scale must be between 0 and 1.');
   if (!Number.isFinite(minDepth) || !Number.isFinite(maxDepth) || minDepth <= 0 || maxDepth < minDepth) throw new Error('Extrusion depths must be positive with minimum no greater than maximum.');
+  if (!Number.isFinite(segmentLength) || segmentLength < 0.01 || segmentLength > 1) throw new Error('Extrusion length per segment must be between 0.01 and 1.');
   const stages = [], record = (name, result) => {
     if (result.mesh.faces.length > 50000) throw new Error('The layered mesh exceeds the 50,000-face editing limit. Reduce grid subdivisions or subdivision passes.');
+    if (name === 'Diamond dual' || name === 'Hexelate · face-center dual') {
+      try { validatePolygonMesh(result.mesh); for (const face of result.mesh.faces) triangulateFace(result.mesh, face); }
+      catch { throw new Error(`${name === 'Diamond dual' ? name : 'Hexelate'} produced a folded polygon. Enable Inset faces or Subdivide & smooth.`); }
+    }
     stages.push({ name, vertices: result.mesh.vertices.length, faces: result.mesh.faces.length, selected: result.faceIds.length });
     return result;
   };
@@ -35,18 +41,32 @@ export function createMeshLayers(base, { enabled = true, seed = 1, insetScale = 
   const averaged = averageVerticesEnabled ? record('Average vertices · fixed boundary', averageVertices(dual.mesh, targets)) : { mesh: dual.mesh, faceIds: targets };
   const inset = insetEnabled ? record('Inset caps', insetFaces(averaged.mesh, averaged.faceIds, insetScale)) : averaged;
   // Separate streams keep depth sampling independent of triangulation's draws.
-  const randomDepth = createSeededRandom((seed ^ 0x9e3779b9) >>> 0), samples = [];
+  const randomDepth = createSeededRandom((seed ^ 0x9e3779b9) >>> 0), samples = [], sampledSegments = new Map();
   const raised = extrusionEnabled ? record('Random segmented extrusion', extrudeFaces(inset.mesh, inset.faceIds, (id) => {
-    const depth = minDepth + (maxDepth - minDepth) * randomDepth();
-    samples.push(depth);
+    const amount = minDepth + (maxDepth - minDepth) * randomDepth(), segments = Math.max(1, Math.floor(amount));
+    const depth = segments * segmentLength;
+    samples.push(depth); sampledSegments.set(id, segments);
     return extrusionTransform({ depth });
-  }, { segments })) : inset;
+  }, { segments: id => sampledSegments.get(id) })) : inset;
   if (raised.mesh.faces.length > 50000) throw new Error('The layered mesh exceeds the 50,000-face editing limit. Reduce grid subdivisions.');
   const smoothed = subdivisionEnabled ? record('Subdivide & smooth · fixed boundary', subdivideSmooth(raised.mesh, raised.faceIds, { iterations: subdivisionIterations })) : raised;
-  const final = diamondDualEnabled ? record('Diamond dual', dualDiamond(smoothed.mesh)) : smoothed;
+  const diamond = diamondDualEnabled ? record('Diamond dual', dualDiamond(smoothed.mesh)) : smoothed;
+  const prepared = hexelateTriangulateEnabled ? record('Triangulate before Hexelate', triangulateFaces(diamond.mesh, undefined,
+    { random: createSeededRandom((seed ^ 0xa511e9b3) >>> 0) })) : diamond;
+  const hexelated = hexelateEnabled ? record('Hexelate · face-center dual', dualNSided(prepared.mesh)) : prepared;
+  const final = finalAverageVerticesEnabled ? record('Final average vertices · fixed boundary',
+    { ...hexelated, ...averageVertices(hexelated.mesh, hexelated.faceIds) }) : hexelated;
+  if (hexelateTriangulateEnabled && hexelateEnabled) {
+    try { validatePolygonMesh(final.mesh); for (const face of final.mesh.faces) triangulateFace(final.mesh, face); }
+    catch { throw new Error('Hexelate produced a folded polygon. Enable Inset faces or Subdivide & smooth, or disable Triangulate before Hexelate.'); }
+  }
+  let binding = createExtrusionBinding(raised.mesh, extrusionEnabled ? raised.extrusions : []);
+  if (subdivisionEnabled) binding = refineBinding(binding, smoothed.vertexStages);
+  if (diamondDualEnabled) binding = refineBinding(binding, [diamond.vertexSources]);
+  if (hexelateEnabled) binding = refineBinding(binding, [final.vertexSources]);
   if (final.mesh.faces.length > 50000) throw new Error('The layered mesh exceeds the 50,000-face editing limit. Reduce grid subdivisions or subdivision passes.');
   const depths = new Map(extrusionEnabled ? raised.faceIds.map((faceId, index) => [faceId, samples[index]]) : []);
-  return { mesh: final.mesh, faceIds: final.faceIds, stages,
+  return { mesh: final.mesh, faceIds: final.faceIds, stages, binding,
     depths: final.faceIds.flatMap(faceId => {
       const source = final.sourceFaces?.[faceId] ?? faceId;
       return depths.has(source) ? [{ faceId, depth: depths.get(source) }] : [];

@@ -2,6 +2,18 @@
   "version": 1,
   "sketch": "2026-10-16",
   "materials": {
+    "mesh": {
+      "metalness": 0.88,
+      "roughness": 0.37,
+      "emissiveIntensity": 0,
+      "envMapIntensity": 1,
+      "opacity": 1,
+      "color": "#ffffff",
+      "emissive": "#ffffff",
+      "wireframe": false,
+      "flatShading": true,
+      "normalMix": 0.47
+    },
     "text": {
       "metalness": 0,
       "roughness": 1,
@@ -17,7 +29,7 @@
   "lighting": {
     "directional": {
       "enabled": true,
-      "color": "#ffd5bc",
+      "color": "#ffdbb4",
       "intensity": 2.6,
       "offsetX": -3,
       "height": 7,
@@ -29,8 +41,8 @@
     },
     "hemisphere": {
       "enabled": true,
-      "skyColor": "#8bc7ff",
-      "groundColor": "#51303b",
+      "skyColor": "#80ddd9",
+      "groundColor": "#4e302b",
       "intensity": 0.7,
       "yaw": 0,
       "tilt": 0
@@ -39,19 +51,19 @@
       "enabled": true,
       "intensity": 1,
       "rotation": 0,
-      "backgroundColor": "#000000",
-      "keyColor": "#ffad83",
-      "stripColor": "#fff1df",
-      "fillColor": "#147aff",
-      "rimColor": "#5ed5ff",
-      "accentColor": "#d997aa",
-      "bounceColor": "#ffac8c",
-      "backColor": "#a99cb7"
+      "backgroundColor": "#101c20",
+      "keyColor": "#ff914e",
+      "stripColor": "#fff0d6",
+      "fillColor": "#087f8c",
+      "rimColor": "#51d4cc",
+      "accentColor": "#d3584b",
+      "bounceColor": "#e1ac69",
+      "backColor": "#4c6f78"
     },
     "occlusion": {
-      "enabled": false,
-      "intensity": 1.5,
-      "radius": 0.8,
+      "enabled": true,
+      "intensity": 2.54,
+      "radius": 1.75,
       "aoOnly": false
     }
   },
@@ -127,28 +139,46 @@
     }
   },
   "mesh": {
-    "shortSideSubdivisions": 4
-  },
-  "editing": {
-    "selectedOnly": true
+    "shortSideSubdivisions": 5
   },
   "pipeline": {
     "enabled": true,
     "initialDiamondDualEnabled": true,
+    "seed": 1,
     "triangulateEnabled": true,
     "faceCenterDualEnabled": true,
     "averageVerticesEnabled": true,
     "insetEnabled": true,
+    "insetScale": 0.89,
     "extrusionEnabled": true,
     "excludeInitialBorderTriangles": true,
-    "seed": 1,
-    "insetScale": 0.5,
-    "minDepth": 1,
-    "maxDepth": 3,
-    "segments": 3,
+    "minDepth": 2.07,
+    "maxDepth": 4.45,
+    "segmentLength": 0.64,
     "subdivisionEnabled": true,
     "subdivisionIterations": 1,
-    "diamondDualEnabled": true
+    "diamondDualEnabled": true,
+    "hexelateTriangulateEnabled": true,
+    "hexelateEnabled": true,
+    "finalAverageVerticesEnabled": true
+  },
+  "editing": {
+    "selectedOnly": true
+  },
+  "rig": {
+    "enabled": true,
+    "simulate": true,
+    "gravity": 15.2,
+    "coneAngle": 10,
+    "twistAngle": 17,
+    "linearDamping": 7.53,
+    "angularDamping": 11.4,
+    "hoverEnabled": true,
+    "hoverAcceleration": 14,
+    "density": 1,
+    "showBones": true,
+    "showJoints": false,
+    "showColliders": false
   },
   "extrusion": {
     "offsetX": 0,
@@ -253,8 +283,8 @@
     "color": "#3c6c85"
   },
   "fog": {
-    "enabled": true,
-    "color": "#000000",
+    "enabled": false,
+    "color": "#101c20",
     "near": 10,
     "far": 30
   },
@@ -267,8 +297,8 @@
     "follow": true,
     "optimizedTextures": false,
     "followSmoothing": 0.45,
-    "yaw": 0,
-    "elevation": 0,
+    "yaw": 141.002077731,
+    "elevation": 5.5698973242,
     "distance": 7,
     "offsetX": 0,
     "offsetY": 0,
@@ -276,7 +306,8 @@
     "fov": 42
   },
   "visibility": {
-    "wireframe": true,
+    "surface": true,
+    "wireframe": false,
     "ground": false,
     "fps": false,
     "text": false

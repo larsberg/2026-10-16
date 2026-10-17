@@ -10,7 +10,7 @@ export function materialControlsMarkup() {
     ];
     return `<details class="material-group" ${index === 0 ? "open" : ""}>
       <summary>${name}</summary>
-      <p class="camera-hint">Text surface</p>
+      <p class="camera-hint">${group === 'mesh' ? 'Blobby mesh material. With Flat shading on, blend from flat polygon faces (0) to smooth normals (1). Turning Flat shading off uses smooth normals.' : 'Text surface'}</p>
       ${colors.map(([key, label]) => `<label class="color-label" for="material-${group}-${key}">
         ${label}<output>${values[key]}</output><input id="material-${group}-${key}" type="color" value="${values[key]}">
       </label>`).join("")}
@@ -52,7 +52,10 @@ export function bindMaterialControls(root, materials, onChange) {
       material.emissive.set(values.emissive);
       material.wireframe = values.wireframe;
       material.flatShading = values.flatShading;
-      for (const [key] of materialFieldsFor(group)) material[key] = values[key];
+      for (const [key] of materialFieldsFor(group)) {
+        if (key === 'normalMix') material.userData.normalMix = values[key];
+        else material[key] = values[key];
+      }
       for (const [key, input] of Object.entries(inputs[group])) {
         const output = root.querySelector(`label[for="${input.id}"] output`);
         if (output) output.value = String(values[key]);

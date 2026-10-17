@@ -38,6 +38,9 @@ importers:
       '@tiptap/starter-kit':
         specifier: ^3.31.3
         version: 3.32.0
+      box3d-wasm:
+        specifier: 0.2.0
+        version: 0.2.0
       three:
         specifier: 0.185.1
         version: 0.185.1
@@ -331,6 +334,10 @@ packages:
 
   '@tybys/wasm-util@0.10.4':
     resolution: {integrity: sha512-W3c4gRigFS0T/Ma4qIYF3GDAc5AQdHb1yL5znJT1Zv1YaD9Kitx656wBjvr19qbiosmZT8lWDM5BEMynUqX65A==}
+
+  box3d-wasm@0.2.0:
+    resolution: {integrity: sha512-cvju1RYCTeChr+CUc2Sh+EsFaypP+6SSlNNSuf4Y3+e4nUFu1O25xQLZTBVUqp1+Wn4Xa2fA4cxrtLzLoWOk4A==}
+    engines: {node: '>=22'}
 
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
@@ -836,6 +843,8 @@ snapshots:
     dependencies:
       tslib: 2.8.1
     optional: true
+
+  box3d-wasm@0.2.0: {}
 
   detect-libc@2.1.2: {}
 

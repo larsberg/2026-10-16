@@ -33,12 +33,28 @@ export function faceFrame(mesh, face) {
 // vertices. Preserve the source loop's orientation, including reversed faces.
 export function triangulateFace(mesh, face) {
   if (face.length === 3) return [[...face]];
-  const { center, x, y } = faceFrame(mesh, face);
-  const contour = face.map(id => {
-    const p = point(mesh, id).sub(center);
-    return new Vector2(p.dot(x), p.dot(y));
-  });
-  const triangles = ShapeUtils.triangulateShape(contour, []);
+  const { center, x, y, normal } = faceFrame(mesh, face);
+  const points = face.map(id => point(mesh, id).sub(center));
+  const project = (u, v) => points.map(p => new Vector2(p.dot(u), p.dot(v)));
+  let contour = project(x, y), triangles = ShapeUtils.triangulateShape(contour, []);
+  // A dual around independently raised faces can fold out of plane. Its
+  // Newell projection may overlap vertical edges; try another projection
+  // only for nonplanar faces, preserving the original cyclic winding.
+  const size = Math.max(...points.map(p => p.length()));
+  if (triangles.length !== face.length - 2 && points.some(p => Math.abs(p.dot(normal)) > size * 1e-6)) {
+    const directions = Array.from({ length: 60 }, (_, i) => {
+      const z = (i + 0.5) / 30 - 1, radius = Math.sqrt(1 - z * z);
+      const direction = new Vector3(Math.cos(i * 2.4) * radius, Math.sin(i * 2.4) * radius, z);
+      return direction.dot(normal) < 0 ? direction.negate() : direction;
+    }).sort((a, b) => b.dot(normal) - a.dot(normal));
+    for (const direction of directions) {
+      const u = x.clone().addScaledVector(direction, -x.dot(direction)).normalize();
+      if (u.lengthSq() < 0.5) continue;
+      contour = project(u, direction.clone().cross(u));
+      triangles = ShapeUtils.triangulateShape(contour, []);
+      if (triangles.length === face.length - 2) break;
+    }
+  }
   if (triangles.length !== face.length - 2) throw new Error('Face cannot be triangulated: check for crossing edges or duplicate points.');
   return triangles.map(triangle => {
     const [a, b, c] = triangle.map(id => contour[id]);
@@ -125,7 +141,8 @@ export function dualDiamond(mesh, { quadsOnly = false } = {}) {
   result.faces = [...edges.values()].filter(h => !quadsOnly || h.twin).map(h => h.twin
     ? [h.a, offset + h.twin.face, h.b, offset + h.face]
     : [h.a, h.b, offset + h.face]);
-  return { mesh: compact(result), faceIds: [] };
+  const vertexSources = [...new Set(result.faces.flat())].map(id => id < offset ? [id] : [...mesh.faces[id - offset]]);
+  return { mesh: compact(result), faceIds: [], vertexSources };
 }
 
 // Follow half-edge connectivity instead of sorting angles: rings remain
@@ -134,9 +151,11 @@ export function dualDiamond(mesh, { quadsOnly = false } = {}) {
 export function dualNSided(mesh) {
   const { edges, outgoing } = halfEdges(mesh);
   const vertices = mesh.faces.map(face => faceFrame(mesh, face).center.toArray()), faces = [], faceSources = [], midpoints = new Map();
+  const sources = mesh.faces.map(face => [...face]);
   for (const [key, h] of edges) if (!h.twin) {
     midpoints.set(key, vertices.length);
     vertices.push(point(mesh, h.a).add(point(mesh, h.b)).multiplyScalar(0.5).toArray());
+    sources.push([h.a, h.b]);
   }
   outgoing.forEach((list, vertex) => {
     if (!list.length) return;
@@ -150,12 +169,14 @@ export function dualNSided(mesh) {
       const origin = point(mesh, vertex), u = new Vector3(...vertices[a]).sub(origin), v = new Vector3(...vertices[b]).sub(origin);
       if (new Vector3().crossVectors(u, v).lengthSq() > EPSILON * EPSILON * u.lengthSq() * v.lengthSq() || u.dot(v) >= 0) {
         face.push(vertices.length); vertices.push(origin.toArray());
+        sources.push([vertex]);
       }
     }
     if (face.length < 3) throw new Error('Dual operation requires at least three faces around an interior vertex.');
     faces.push(face);
   });
-  return { mesh: compact({ ...mesh, vertices, faces }), faceIds: [], faceSources };
+  const vertexSources = [...new Set(faces.flat())].map(id => sources[id]);
+  return { mesh: compact({ ...mesh, vertices, faces }), faceIds: [], faceSources, vertexSources };
 }
 
 export function extrusionTransform({ offsetX = 0, offsetY = 0, depth = 0.5, rotateX = 0, rotateY = 0, rotateZ = 0, scaleX = 1, scaleY = 1 } = {}) {
@@ -205,37 +226,44 @@ export function insetFaces(mesh, ids, scale = 0.5) {
 export function extrudeFaces(mesh, ids, transform = extrusionTransform(), { segments = 1 } = {}) {
   validatePolygonMesh(mesh);
   const selected = new Set(selectedFaceIds(mesh, ids));
-  if (!Number.isInteger(segments) || segments < 1 || segments > 32) throw new Error('Extrusion segments must be an integer from 1 to 32.');
+  const validateSegments = value => {
+    if (!Number.isInteger(value) || value < 1 || value > 32) throw new Error('Extrusion segments must be an integer from 1 to 32.');
+    return value;
+  };
+  if (typeof segments !== 'function') validateSegments(segments);
   const validateTransform = matrix => {
     if (!matrix?.isMatrix4 || !matrix.elements.every(Number.isFinite) || Math.abs(matrix.determinant()) < EPSILON || matrix.elements[3] !== 0 || matrix.elements[7] !== 0 || matrix.elements[11] !== 0 || matrix.elements[15] !== 1) throw new Error('Expected an invertible affine extrusion transform.');
   };
   if (typeof transform !== 'function') validateTransform(transform);
-  const result = copyMesh(mesh), faceIds = [];
+  const result = copyMesh(mesh), faceIds = [], extrusions = [];
   result.faces = [];
   mesh.faces.forEach((face, id) => {
     if (!selected.has(id)) { result.faces.push([...face]); return; }
     const frame = faceFrame(mesh, face), matrix = typeof transform === 'function' ? transform(id, frame) : transform;
     validateTransform(matrix);
+    const count = validateSegments(typeof segments === 'function' ? segments(id, frame) : segments);
     const endpoints = face.map(vertex => {
       const p = point(mesh, vertex).sub(frame.center);
       const local = new Vector3(p.dot(frame.x), p.dot(frame.y), p.dot(frame.normal)).applyMatrix4(matrix);
       return frame.center.clone().addScaledVector(frame.x, local.x).addScaledVector(frame.y, local.y).addScaledVector(frame.normal, local.z);
     });
     const rings = [face];
-    for (let segment = 1; segment <= segments; segment++) {
+    for (let segment = 1; segment <= count; segment++) {
       rings.push(face.map((vertex, i) => {
-        const moved = point(mesh, vertex).lerp(endpoints[i], segment / segments);
+        const moved = point(mesh, vertex).lerp(endpoints[i], segment / count);
         result.vertices.push(moved.toArray()); return result.vertices.length - 1;
       }));
     }
     faceIds.push(result.faces.length); result.faces.push(rings.at(-1));
-    for (let segment = 0; segment < segments; segment++) face.forEach((_, i) => {
+    extrusions.push({ sourceFace: id, rings });
+    for (let segment = 0; segment < count; segment++) face.forEach((_, i) => {
       const next = (i + 1) % face.length, lower = rings[segment], upper = rings[segment + 1];
       result.faces.push([lower[i], lower[next], upper[next], upper[i]]);
     });
   });
   validatePolygonMesh(result);
-  return { mesh: compact(result), faceIds };
+  const remap = new Map([...new Set(result.faces.flat())].map((id, index) => [id, index]));
+  return { mesh: compact(result), faceIds, extrusions: extrusions.map(({ sourceFace, rings }) => ({ sourceFace, rings: rings.map(ring => ring.map(id => remap.get(id))) })) };
 }
 
 // One simultaneous neighbor-average update. Only actual polygon edges define
@@ -263,6 +291,7 @@ export function averageVertices(mesh, ids) {
 export function subdivideSmooth(mesh, ids, { iterations = 1 } = {}) {
   if (!Number.isInteger(iterations) || iterations < 1 || iterations > 3) throw new Error('Subdivision passes must be an integer from 1 to 3.');
   let result = mesh, selected = selectedFaceIds(mesh, ids), sourceFaces = mesh.faces.map((_, id) => id);
+  const vertexStages = [];
   for (let pass = 0; pass < iterations; pass++) {
     const { edges, outgoing } = halfEdges(result);
     outgoing.filter(list => list.length).forEach(vertexRing);
@@ -287,6 +316,7 @@ export function subdivideSmooth(mesh, ids, { iterations = 1 } = {}) {
       edgeIds.set(key, vertices.length); vertices.push(value.toArray());
     }
     const centerOffset = vertices.length;
+    vertexStages.push([...result.vertices.map((_, id) => [id]), ...[...edges.values()].map(h => [h.a, h.b]), ...result.faces.map(face => [...face])]);
     vertices.push(...centers.map(center => center.toArray()));
     const faces = [], faceIds = [], sources = [], parents = [], selectedSet = new Set(selected);
     result.faces.forEach((face, id) => face.forEach((vertex, corner) => {
@@ -316,5 +346,5 @@ export function subdivideSmooth(mesh, ids, { iterations = 1 } = {}) {
     result = candidate; selected = faceIds; sourceFaces = sources;
     validatePolygonMesh(result);
   }
-  return { mesh: result, faceIds: selected, sourceFaces };
+  return { mesh: result, faceIds: selected, sourceFaces, vertexStages };
 }

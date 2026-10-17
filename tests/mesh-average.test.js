@@ -41,7 +41,7 @@ test('a closed cube averages its three edge neighbors without introducing face d
 test('Average vertices runs after the face-center dual and before inset, preserving boundary and cap eligibility',()=>{
   const base=createViewportMesh(10,8,4),seed=7;
   const dual=dualNSided(triangulateFaces(dualDiamond(base).mesh,undefined,{random:createSeededRandom(seed)}).mesh).mesh;
-  const onlyAverage={seed,insetEnabled:false,extrusionEnabled:false,subdivisionEnabled:false,diamondDualEnabled:false};
+  const onlyAverage={seed,insetEnabled:false,extrusionEnabled:false,subdivisionEnabled:false,diamondDualEnabled:false,hexelateTriangulateEnabled:false,hexelateEnabled:false,finalAverageVerticesEnabled:false};
   const averaged=createMeshLayers(base,onlyAverage),unchanged=createMeshLayers(base,{...onlyAverage,averageVerticesEnabled:false});
   assert.deepEqual(unchanged.mesh,dual);
   assert.deepEqual(averaged.mesh,averageVertices(dual).mesh);
@@ -54,4 +54,17 @@ test('Average vertices runs after the face-center dual and before inset, preserv
   assert.ok(names.indexOf('Average vertices · fixed boundary')<names.indexOf('Inset caps'));
   assert.equal(enabled.stages.find(stage=>stage.name==='Inset caps').selected,disabled.stages.find(stage=>stage.name==='Inset caps').selected);
   assert.deepEqual(enabled,createMeshLayers(base,{seed}));
+});
+
+test('final averaging runs after Hexelate with fixed boundary, unchanged faces, selection, and bone weights',()=>{
+  for(const diamondDualEnabled of [false,true]) {
+    const base=createViewportMesh(8,8,4),raw=createMeshLayers(base,{diamondDualEnabled,finalAverageVerticesEnabled:false});
+    const result=createMeshLayers(base,{diamondDualEnabled,finalAverageVerticesEnabled:true});
+    assert.equal(result.stages.at(-2).name,'Hexelate · face-center dual');
+    assert.equal(result.stages.at(-1).name,'Final average vertices · fixed boundary');
+    assert.deepEqual(result.mesh,averageVertices(raw.mesh,raw.faceIds).mesh);
+    assert.notDeepEqual(result.mesh.vertices,raw.mesh.vertices);assert.deepEqual(result.mesh.faces,raw.mesh.faces);
+    assert.deepEqual(result.binding,raw.binding);assert.deepEqual(result.faceIds,raw.faceIds);
+    for(const id of adjacency(raw.mesh).boundary)assert.deepEqual(result.mesh.vertices[id],raw.mesh.vertices[id]);
+  }
 });

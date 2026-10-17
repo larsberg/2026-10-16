@@ -23,7 +23,7 @@ function fieldMarkup(group, [key, label, initial, min, max, step]) {
 export function meshControlsMarkup() {
   const fields = group => meshFields[group].map(field => fieldMarkup(group, field)).join('');
   const saveLabel = import.meta.env?.PROD ? 'Save on this device' : 'Save settings';
-  const tabs = ['Mesh', 'Audio', 'Materials', 'Lighting', 'Camera', 'Info'];
+  const tabs = ['Mesh', 'Motion', 'Audio', 'Materials', 'Lighting', 'Camera', 'Info'];
   return `
     <button class="icon-button drawer-toggle" aria-label="Open controls" title="Open controls" aria-expanded="false" aria-controls="controls-drawer">
       ${icon('m6 6 12 12M18 6 6 18')}
@@ -48,9 +48,12 @@ export function meshControlsMarkup() {
             <details class="material-group" open><summary>Operation layers</summary>
               <p class="camera-hint">Toggle each pass below; enabled passes run in numbered order. Average vertices runs after the face-center dual and before inset, using connected neighbors while keeping boundary vertices fixed. Border descendants can be excluded from inset and extrusion. Smoothing also keeps the boundary fixed. The final dual clears selection.</p>
               ${meshFields.pipeline.filter(([key]) => key !== 'seed').map(field => fieldMarkup('pipeline', field)).join('')}
+              <p class="camera-hint">Each piece uses floor(extrusion amount) segments, with a minimum of one. Extrusion length per segment sets their length: total depth = segment count × segment length.</p>
               <div class="camera-controls">${fieldMarkup('pipeline', meshFields.pipeline.find(([key]) => key === 'seed'))}</div>
               <button type="button" data-mesh-action="randomize">New variation</button>
+              <p class="camera-hint">Triangulate before Hexelate splits the current faces with seeded random diagonals. The face-center dual forms polygon cells, mostly with five to seven sides. The final Average vertices pass relaxes them while keeping the boundary fixed. Disable triangulation to take the direct dual of the previous pass. Mesh wireframe shows the polygon edges.</p>
               <p class="layer-stats camera-hint"></p>
+              <p class="face-sides camera-hint"></p>
             </details>
             <p class="control-heading">Faces</p>
             <p class="camera-hint">Click a face to select it. Shift-click toggles more faces. Drag to orbit. Selected edges are amber.</p>
@@ -71,6 +74,14 @@ export function meshControlsMarkup() {
               ${meshFields.visibility.filter(([key]) => key !== 'fps').map(field => fieldMarkup('visibility', field)).join('')}
             </div><p class="mesh-stats"></p>
           </section>
+          <section id="panel-motion" role="tabpanel" aria-labelledby="tab-motion" hidden>
+            <details class="material-group" open><summary>Bones &amp; colliders</summary>
+              <p class="camera-hint">Each piece has one collider and bone per extrusion segment. Segment count and length come from the Mesh tab. Each chain has a fixed root and cone-limited joints. Hover over a collider to accelerate it away from the pointer, even with collider outlines hidden. Drag to orbit. Resizing or changing mesh layers rebuilds the rig.</p>
+              ${fields('rig')}
+              <button type="button" data-mesh-action="nudgeRig">Nudge bone chains</button>
+              <p class="rig-stats camera-hint"></p>
+            </details>
+          </section>
           <section id="panel-audio" role="tabpanel" aria-labelledby="tab-audio" hidden>
             <p class="control-heading">Strudel</p>${fields('audio')}
             <p class="camera-hint">No composition yet. Audio stays silent until a score is added. Tempo, levels, instruments, and effects are ready for the generative composition.</p>
@@ -80,7 +91,7 @@ export function meshControlsMarkup() {
             ${instrumentControlsMarkup()}
           </section>
           <section id="panel-materials" role="tabpanel" aria-labelledby="tab-materials" hidden>
-            <p class="control-heading">Mesh wireframe</p>${fields('appearance')}
+            <p class="control-heading">Wireframe overlay</p>${fields('appearance')}
             <details class="material-group" open><summary>Tile floor</summary>${fields('floor')}<p class="camera-hint">Tile depth recesses the grout and adds beveled edges that catch the light. Zero gives a seamless ground plane. Increase roughness for a softer tile finish.</p></details>
             ${materialControlsMarkup()}
           </section>
@@ -166,8 +177,10 @@ export function bindMeshControls(shell, { ui, change, playPause, reset, resetCam
         if (output) output.value = typeof value === 'number' ? String(Number(value.toFixed(3))) : value;
       }
     },
-    editing({ selected, faces, canUndo, layers = [] }) {
+    editing({ selected, faces, canUndo, layers = [], faceSides = {}, rig }) {
       query('.layer-stats').textContent = layers.map(stage => `${stage.name}: ${stage.faces} faces`).join(' · ');
+      query('.face-sides').textContent = `Final polygons · ${Object.entries(faceSides).sort(([a], [b]) => Number(a) - Number(b)).map(([sides, count]) => `${count} with ${sides} sides`).join(' · ')}`;
+      query('.rig-stats').textContent = rig ? `${rig.chains} fixed-root chains · ${rig.bones} bones · ${rig.joints} cone joints · ${rig.colliders} piece colliders · ${rig.baseColliders} static base plane` : 'No active rig. Enable extrusion and binding, or regenerate after manual edits.';
       query('.face-selection-status').textContent = `${selected} / ${faces} faces selected`;
       query('[data-mesh-action="undo"]').disabled = !canUndo;
     },

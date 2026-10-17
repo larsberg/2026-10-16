@@ -26,6 +26,7 @@
     "@tiptap/extension-text-align": "^3.31.3",
     "@tiptap/pm": "^3.31.3",
     "@tiptap/starter-kit": "^3.31.3",
+    "box3d-wasm": "0.2.0",
     "three": "0.185.1"
   },
   "devDependencies": {
