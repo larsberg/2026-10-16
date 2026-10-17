@@ -14,6 +14,7 @@ export function initMeshRigPhysics() {
 }
 
 export const defaultRigSettings = Object.freeze({ ...defaultChainNoteSettings, enabled: true, simulate: true, gravity: 0, coneAngle: 60, twistAngle: 90,
+  grabStiffness: 30, grabDamping: .75,
   linearDamping: 1, angularDamping: 1, hoverEnabled: true, hoverAcceleration: 14, jointOverlap: 1, density: 1, showBones: true, showJoints: false, showColliders: false });
 
 export function createMeshRig(binding, geometry, material, initial = {}, notePalette = []) {
@@ -162,35 +163,28 @@ export function createMeshRig(binding, geometry, material, initial = {}, notePal
   const position = new Vector3(), rotation = new Quaternion(), offset = new Vector3();
   const hoverCaster = new Raycaster(); let hoverActive = false, hovered = null;
   let drag = null;
+  function endDrag() {
+    if (!drag) return;
+    drag.joint.destroy(); drag.joint.delete();
+    drag.anchor.destroy(); drag.anchor.delete();
+    drag = null;
+  }
   function beginDrag(link, worldPoint) {
     if (disposed || !settings.simulate || (!links.includes(link) && link !== coreLink) || !link.physicsEnabled) return false;
+    endDrag();
     group.updateWorldMatrix(true, false);
     const point = group.worldToLocal(worldPoint.clone());
-    const local = point.clone().sub(new Vector3().copy(link.body.getPosition()).divideScalar(physicsScale))
-      .applyQuaternion(new Quaternion().copy(link.body.getRotation()).invert()).divideScalar(link.currentScale);
-    drag = { link, local, target: point, origin: point.clone(), coreOrigin: core ? new Vector3().copy(core.getPosition()).divideScalar(physicsScale) : null }; hovered = null; return true;
-  }
-  function pullDrag(dt) {
-    if (!drag) return;
-    const { link, local, target } = drag, body = link.body;
-    // Carry the free body with the grab, even while note envelopes change the
-    // other chains. The local spring still bends the held piece at its joints.
-    if (core) {
-      const desired = toPhysics(drag.coreOrigin.clone().add(target).sub(drag.origin));
-      const totalMass = core.getMass() + links.reduce((sum, item) => sum + (item.physicsEnabled ? item.body.getMass() : 0), 0);
-      const acceleration = desired.sub(new Vector3().copy(core.getPosition())).multiplyScalar(100)
-        .addScaledVector(new Vector3().copy(core.getLinearVelocity()), -20)
-        .divideScalar(1 + 20 * dt + 100 * dt * dt).clampLength(0, 180 * physicsScale);
-      core.applyLinearImpulseToCenter(acceleration.multiplyScalar(totalMass * dt), true);
-    }
-    if (!link.physicsEnabled) return;
-    const center = new Vector3().copy(body.getPosition());
-    const arm = toPhysics(local.clone().multiplyScalar(link.currentScale)).applyQuaternion(new Quaternion().copy(body.getRotation()));
-    const point = center.clone().add(arm);
-    const velocity = new Vector3().copy(body.getAngularVelocity()).cross(arm).add(new Vector3().copy(body.getLinearVelocity()));
-    const acceleration = toPhysics(target).sub(point).multiplyScalar(900).addScaledVector(velocity, -60)
-      .divideScalar(1 + 60 * dt + 900 * dt * dt).clampLength(0, 240 * physicsScale);
-    body.applyForce(acceleration.multiplyScalar(body.getMass()), point, true);
+    const anchor = world.createBody({ type: 'kinematic', position: toPhysics(point) });
+    const mass = (core?.getMass() ?? 0) + links.reduce((sum, item) => sum + item.body.getMass(), 0);
+    // A solver spring at the picked point. Angular torque is disabled so the
+    // form can swing around the grab, and the chain joints carry the core.
+    const joint = world.createMotorJoint(anchor, link.body, {
+      localFrameB: { position: link.body.getLocalPoint(toPhysics(point)) },
+      linearHertz: settings.grabStiffness, linearDampingRatio: settings.grabDamping,
+      maxSpringForce: Math.max(1, mass) * 10000 * physicsScale,
+      maxSpringTorque: 0, maxVelocityForce: 0, maxVelocityTorque: 0, collideConnected: false,
+    });
+    drag = { link, anchor, joint, target: point }; hovered = null; return true;
   }
   function pickCollider(raycaster) {
     group.updateWorldMatrix(true, true);
@@ -303,7 +297,11 @@ export function createMeshRig(binding, geometry, material, initial = {}, notePal
   sync(); skeleton = new Skeleton(bones); skin.bind(skeleton); skin.normalizeSkinWeights();
   function configure(value) {
     Object.assign(settings, value);
-    if (!settings.simulate) drag = null;
+    if (!settings.simulate) endDrag();
+    if (drag) {
+      drag.joint.setLinearHertz(settings.grabStiffness);
+      drag.joint.setLinearDampingRatio(settings.grabDamping);
+    }
     if (!settings.simulate || !settings.notePushEnabled || settings.notePushStrength <= 0) pendingNotePushes.clear();
     chainNotes.configure(value); resizeNoteChains();
     if (value?.damping !== undefined) {
@@ -334,7 +332,7 @@ export function createMeshRig(binding, geometry, material, initial = {}, notePal
     configure,
     beginDrag,
     moveDrag(worldPoint) { if (drag && !disposed) { group.updateWorldMatrix(true, false); drag.target.copy(group.worldToLocal(worldPoint.clone())); } },
-    endDrag() { drag = null; },
+    endDrag,
     get dragging() { return !!drag; },
     triggerNotes,
     setNotePalette(palette) { pendingNotePushes.clear(); chainNotes.setPalette(palette); resizeNoteChains(); sync(); },
@@ -350,9 +348,13 @@ export function createMeshRig(binding, geometry, material, initial = {}, notePal
       // Update rapidly growing hulls between short contact solves, rather
       // than expanding them through the floor once per rendered frame.
       const timeStep = core ? 1 / 240 : 1 / 60;
+      const steps = Math.floor((accumulator + 1e-10) / timeStep);
+      // Reach the latest pointer position over this rendered frame. Supplying
+      // velocity to the solver preserves the throw when the grab is released.
+      if (drag && steps) drag.anchor.setTargetTransform({ position: toPhysics(drag.target) }, steps * timeStep, true);
       while (accumulator >= timeStep - 1e-10) {
         chainNotes.update(timeStep); resizeNoteChains();
-        pushNotes(timeStep, worldRotation); pullDrag(timeStep); repel(timeStep); world.step(timeStep, 8);
+        pushNotes(timeStep, worldRotation); repel(timeStep); world.step(timeStep, 8);
         seconds += timeStep; accumulator = Math.max(0, accumulator - timeStep);
         sync(); stepped = true;
       }
@@ -372,7 +374,7 @@ export function createMeshRig(binding, geometry, material, initial = {}, notePal
       return target;
     },
     dispose() {
-      if (disposed) return; disposed = true; drag = null;
+      if (disposed) return; endDrag(); disposed = true;
       group.removeFromParent(); world.destroy();
       for (const handle of handles.reverse()) handle.delete(); world.delete();
       skeleton.dispose(); boneGeometry.dispose(); jointGeometry.dispose(); boneLines.material.dispose(); jointPoints.material.dispose();

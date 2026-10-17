@@ -44,6 +44,8 @@ export const meshFields = {
     ['jointOverlap', 'Joint overlap (× radius)', 1, 0, 1, 0.01],
     ['linearDamping', 'Linear damping', 1, 0, 20, 0.01],
     ['angularDamping', 'Angular damping', 1, 0, 20, 0.01],
+    ['grabStiffness', 'Grab stiffness (Hz)', 30, 1, 60, 1],
+    ['grabDamping', 'Grab damping', 0.75, 0, 2, 0.01],
     ['hoverEnabled', 'Repel colliders on hover', true],
     ['hoverAcceleration', 'Hover acceleration', 14, 0, 100, 0.1],
     ['density', 'Collider density', 1, 0.1, 10, 0.1],
@@ -127,7 +129,8 @@ export const meshFields = {
 export function defaultMeshSetup() {
   const lighting = defaultLighting();
   lighting.environment.backgroundColor = '#000000';
-  Object.assign(lighting.directional, { enabled: true, color: '#ffd5bc', intensity: 2.6, height: 7, offsetZ: 4, softness: 3, shadowBias: -0.0003 });
+  Object.assign(lighting.directional, { enabled: false, color: '#ffd5bc', intensity: 2.6, height: 7, offsetZ: 4, softness: 3, shadowBias: -0.0003 });
+  lighting.spotlight.color = '#ffd5bc';
   Object.assign(lighting.hemisphere, { skyColor: '#8bc7ff', groundColor: '#51303b', intensity: 0.7 });
   // Keep occlusion optional; surface lighting and studio reflections are active.
   lighting.occlusion.enabled = false;
@@ -151,6 +154,8 @@ export function validateMeshSetup(value) {
   // Existing version-1 saves acquire only the new operation-control defaults.
   value = { ...value, rig: value.rig === undefined ? result.rig : value.rig, pipeline: value.pipeline === undefined ? result.pipeline : value.pipeline, editing: value.editing === undefined ? result.editing : value.editing, extrusion: value.extrusion === undefined ? result.extrusion : value.extrusion };
   if (value.rig && typeof value.rig === 'object') value.rig = { ...value.rig,
+    grabStiffness: value.rig.grabStiffness === undefined ? result.rig.grabStiffness : value.rig.grabStiffness,
+    grabDamping: value.rig.grabDamping === undefined ? result.rig.grabDamping : value.rig.grabDamping,
     noteScaleMax: value.rig.noteScaleMax === undefined
       ? 1 + (value.rig.noteScaleAmount ?? result.rig.noteScaleAmount) * (value.rig.noteWeightMax ?? result.rig.noteWeightMax)
       : value.rig.noteScaleMax,

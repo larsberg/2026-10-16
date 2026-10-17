@@ -2,6 +2,19 @@ import { studioColorFields } from './studio-palettes.js';
 
 // Shared by the drawer and setup API so ranges and saved values agree.
 export const lightingGroups = [
+  { key: "spotlight", label: "Following spotlight", fields: [
+    ["enabled", "Enabled", true], ["color", "Color", "#ffffff"],
+    ["intensity", "Intensity", 600, 0, 3000, 1],
+    ["offsetX", "Offset X", -3, -20, 20, 0.1],
+    ["height", "Offset Y", 8, 1, 30, 0.1],
+    ["offsetZ", "Offset Z", 4, -20, 20, 0.1],
+    ["angle", "Cone half-angle °", 50, 10, 80, 1],
+    ["penumbra", "Soft edge", 0.5, 0, 1, 0.01],
+    ["castShadow", "Cast shadows", true],
+    ["softness", "Shadow softness", 3, 0, 16, 0.1],
+    ["shadowBias", "Shadow bias", -0.0001, -0.01, 0.01, 0.0001],
+    ["normalBias", "Shadow normal bias", 0.025, 0, 0.1, 0.001],
+  ] },
   { key: "directional", label: "Directional light", fields: [
     ["enabled", "Enabled", false], ["color", "Color", "#ffffff"],
     ["intensity", "Intensity", 3.2, 0, 10, 0.01],
@@ -41,6 +54,11 @@ export function defaultLighting() {
 
 export function validateLighting(value) {
   const result = defaultLighting();
+  // Earlier saves used the directional key light. Retain its palette color
+  // while adopting the spotlight once; subsequent saves keep both toggles.
+  if (value && value.spotlight === undefined) value = { ...value,
+    spotlight: { ...result.spotlight, color: value.directional?.color ?? result.spotlight.color },
+    directional: { ...value.directional, enabled: false } };
   for (const { key, fields } of lightingGroups) {
     for (const [name, , initial, min, max] of fields) {
       const field = value?.[key]?.[name];

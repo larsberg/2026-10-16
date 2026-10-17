@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BoxGeometry, DirectionalLight, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, PerspectiveCamera, Scene, Vector3 } from 'three';
+import { BoxGeometry, DirectionalLight, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, PerspectiveCamera, Scene, SpotLight, Vector3 } from 'three';
 import { SurfaceGTAOPass } from '../src/scene-effects.js';
 import { fitMeshShadows } from '../src/mesh-shadows.js';
 
@@ -26,6 +26,26 @@ test('shadow projection contains the rotated deformed surface and refits after g
         assert.ok(Math.abs(p.x)<1&&Math.abs(p.y)<1&&Math.abs(p.z)<1);
       }
       assert.ok(camera.far>camera.near);
+    }
+  }finally{mesh.geometry.dispose();mesh.material.dispose();light.shadow.dispose();}
+});
+
+
+test('following spotlight shadow covers the mesh and floor after translation and height changes',()=>{
+  const light=new SpotLight(),mesh=new Mesh(new BoxGeometry(4,4,4),new MeshBasicMaterial());
+  light.angle=50*Math.PI/180;mesh.rotation.set(.2,.3,.1);
+  try {
+    for(const center of [new Vector3(0,3,0),new Vector3(12,14,-8),new Vector3(-5,2,19)]) {
+      mesh.position.copy(center);light.position.copy(center).add(new Vector3(-3,8,4));light.target.position.copy(center);
+      fitMeshShadows(light,mesh);light.shadow.updateMatrices(light);
+      const camera=light.shadow.camera,attr=mesh.geometry.attributes.position;
+      assert.ok(camera.isPerspectiveCamera);
+      for(let i=0;i<attr.count;i++){
+        const p=new Vector3().fromBufferAttribute(attr,i).applyMatrix4(mesh.matrixWorld).project(camera);
+        assert.ok(Math.abs(p.x)<1&&Math.abs(p.y)<1&&Math.abs(p.z)<1);
+      }
+      const receiver=new Vector3(center.x,0,center.z).project(camera);
+      assert.ok(Math.abs(receiver.z)<1,'The floor must stay inside the shadow depth range');
     }
   }finally{mesh.geometry.dispose();mesh.material.dispose();light.shadow.dispose();}
 });

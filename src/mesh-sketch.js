@@ -13,7 +13,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { createFaceMetal, createStudioEnvironment } from './face-metal.js';
 import { bindFocusPlayback } from './focus-playback.js';
 import { createMarchAudio } from './march-audio.js';
-import { createReferenceScore } from './reference-score.js';
+import { createArrangedScore } from './arranged-score.js';
 import { notePaletteForPattern } from './chain-notes.js';
 import { bindAudioAutoplay } from './audio-autoplay.js';
 import { createCompositionPalette } from './composition-palette.js';
@@ -58,6 +58,7 @@ export async function mountMesh(root,{ui=true}={}) {
   const environment=createStudioEnvironment(renderer,settings.lighting.environment);
   const hemisphere=new THREE.HemisphereLight('#fffbee','#a1a99c',2);scene.add(hemisphere);
   const sun=new THREE.DirectionalLight('#fff5dc',3.3);sun.position.set(-3,7,4);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-6,right:6,top:7,bottom:-5,near:0.5,far:100});sun.shadow.bias=-0.0003;sun.shadow.normalBias=0.025;sun.shadow.radius=3;scene.add(sun,sun.target);
+  const spotlight=new THREE.SpotLight();spotlight.name='Following spotlight';spotlight.castShadow=true;spotlight.shadow.mapSize.set(2048,2048);spotlight.shadow.camera.near=.1;spotlight.shadow.camera.far=100;scene.add(spotlight,spotlight.target);
   const tileFloor=createTileFloor(settings.floor),floor=tileFloor.mesh;scene.add(floor);
   const meshMaterial=createFaceMetal();meshMaterial.envMap=environment.texture;
   const views=createMeshView(scene,meshMaterial);
@@ -68,10 +69,10 @@ export async function mountMesh(root,{ui=true}={}) {
   let running=true,disposed=false,last=0,dirty=true,statsTime=0,frameMs=16.67;
   let panel,lightingControls,stats,focus,colliderDrag,applyingCamera=false,setupBusy=false;
   const audioStatus=shell.querySelector('.march-audio-status');
-  const composition=createReferenceScore();
+  const composition=createArrangedScore();
   views.setNotePalette(notePaletteForPattern(composition));
   const marchAudio=createMarchAudio({pattern:composition,canPlay:()=>running&&!document.hidden,onStatus:message=>{audioStatus.textContent=message;}});
-  const paletteMotion=createCompositionPalette({environment,scene,sun,hemisphere,lighting:settings.lighting});
+  const paletteMotion=createCompositionPalette({environment,scene,sun,hemisphere,spotlight,lighting:settings.lighting});
   const setupAbort=new AbortController(),followTarget=new THREE.Vector3(),worldOrigin=new THREE.Vector3();
   const groupCenter=()=>views.getCenter(followTarget);
   const cameraFollow=createCameraFollow(groupCenter()),follow=cameraFollow.position;
@@ -84,9 +85,8 @@ export async function mountMesh(root,{ui=true}={}) {
       paletteMotion.configure(lighting);
       settings.fog.color=lighting.environment.backgroundColor;panel?.set(settings,'fog');
       meshMaterial.envMap=textProp.material.envMap=environment.texture;
-      tileFloor.configureEnvironment(lighting.environment,environment.texture);
       views.configure(settings);
-    },settings.lighting);
+    },settings.lighting,spotlight);
   const infoControls=bindInfoControls(shell,info=>{textProp.setInfo(info);markChanged();},message=>panel?.status(message,true));
   const followSuspended=()=>orbitDragging||colliderDrag?.active;
   function stopCameraForDrag() {
@@ -138,7 +138,7 @@ export async function mountMesh(root,{ui=true}={}) {
     const optimized=settings.camera.optimizedTextures,filtering=optimized?Math.min(4,renderer.capabilities.getMaxAnisotropy()):renderer.capabilities.getMaxAnisotropy();
     textProp.setTextureQuality(Math.min(optimized?1024:4096,renderer.capabilities.maxTextureSize),filtering);
     const shadowSize=Math.min(optimized?1024:4096,renderer.capabilities.maxTextureSize);
-    if(sun.shadow.mapSize.x!==shadowSize){sun.shadow.mapSize.set(shadowSize,shadowSize);sun.shadow.dispose();sun.shadow.map=null;sun.shadow.mapPass=null;sun.shadow.needsUpdate=true;}
+    for(const light of [sun,spotlight])if(light.shadow.mapSize.x!==shadowSize){light.shadow.mapSize.set(shadowSize,shadowSize);light.shadow.dispose();light.shadow.map=null;light.shadow.mapPass=null;light.shadow.needsUpdate=true;}
     if(meshChanged||restoringView)regenerate();
     panel?.set(settings);markChanged();dirty=true;return getSetup();
   }
@@ -223,7 +223,8 @@ export async function mountMesh(root,{ui=true}={}) {
       const delta=groupCenter().clone().sub(follow);camera.position.add(delta);controls.target.add(delta);
       cameraFollow.reset(groupCenter());controls.update();
     }
-    fitMeshShadows(sun,views.surface?.mesh);
+    lightingControls.updatePosition(groupCenter());
+    for(const light of [sun,spotlight])if(light.visible&&light.castShadow)fitMeshShadows(light,views.surface?.mesh);
   }
   const resize=new ResizeObserver(()=>{
     const w=shell.clientWidth,h=shell.clientHeight;
@@ -249,14 +250,14 @@ export async function mountMesh(root,{ui=true}={}) {
       syncEditing();dirty=false;statsTime=time;
     }
     cameraFollow.update(camera,controls,groupCenter(),settings.camera.follow,followSuspended(),dt,settings.camera.followSmoothing);
-    lightingControls.updatePosition(groupCenter());
     controls.update();
     colliderDrag.update();colliderHover.update();
     const noteEvents=marchAudio.drainEvents();
     if(noteEvents.length){views.rig?.triggerNotes(noteEvents);}
     paletteMotion.update(dt);
     views.update(dt,running);
-    fitMeshShadows(sun,views.surface?.mesh);
+    lightingControls.updatePosition(groupCenter());
+    for(const light of [sun,spotlight])if(light.visible&&light.castShadow)fitMeshShadows(light,views.surface?.mesh);
     effects.render();startup.reveal();stats?.update();
   });
   const thumbnailCapture = import.meta.env.DEV ? bindThumbnailCapture(shell, renderer.domElement, () => effects.render()) : null;
@@ -266,7 +267,7 @@ export async function mountMesh(root,{ui=true}={}) {
     dispose(){disposed=true;startup.dispose();renderer.setAnimationLoop(null);setupAbort.abort();unbindAudio();marchAudio.dispose();focus.dispose();resize.disconnect();faceSelection.dispose();controls.removeEventListener('start',startOrbit);controls.removeEventListener('end',endOrbit);controls.dispose();panel.dispose();infoControls.dispose();thumbnailCapture?.dispose(); effects.dispose();stats?.dom.remove();
       colliderDrag.dispose();colliderHover.dispose();views.dispose();meshMaterial.dispose();tileFloor.dispose();
       const geometries=new Set(),materials=new Set();scene.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});
-      geometries.delete(textProp.mesh.geometry);materials.delete(textProp.material);textProp.dispose();geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());environment.dispose();sun.shadow.dispose();renderer.dispose();shell.remove();if(window.__meshSketch===api)delete window.__meshSketch;
+      geometries.delete(textProp.mesh.geometry);materials.delete(textProp.material);textProp.dispose();geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());environment.dispose();sun.shadow.dispose();spotlight.shadow.dispose();renderer.dispose();shell.remove();if(window.__meshSketch===api)delete window.__meshSketch;
     }};
   window.__meshSketch=api;
   api.ready=ready;

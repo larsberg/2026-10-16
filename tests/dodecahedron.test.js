@@ -60,7 +60,7 @@ test('the core falls, rebounds off the ground and carries all base skin vertices
   }finally{item.dispose();}
 });
 
-test('strong grab translates the whole articulated body and roots stay attached through rotation',()=>{
+test('grab moves the articulated body through its joints and roots stay attached through rotation',()=>{
   const item=fixture({minDepth:3.59,maxDepth:4.78,segmentLength:.99,insetScale:.82},{gravity:12.4,linearDamping:3.87,angularDamping:8.31});
   try {
     const {rig}=item;assert.ok(rig.core.getMass()>0,'The core hull must fit native hull limits');
@@ -69,7 +69,7 @@ test('strong grab translates the whole articulated body and roots stay attached 
     const target=grab.clone().add(new Vector3(4,3,0));
     assert.equal(rig.beginDrag(link,grab),true);rig.moveDrag(target);
     for(let i=0;i<120;i++)rig.step(1/60);
-    const moved=rig.getCenter().sub(origin);assert.ok(moved.x>3.5&&moved.y>2.5,JSON.stringify(moved));
+    const moved=rig.getCenter().sub(origin);assert.ok(moved.x>2&&moved.y>1.5,JSON.stringify(moved));
     assert.ok(new Vector3().copy(link.body.getPosition()).divideScalar(rig.physicsScale).distanceTo(target)<.3);
     const coreRotation=new Quaternion().copy(rig.core.getRotation());
     for(const chain of rig.chains){
@@ -155,4 +155,44 @@ for(const attack of [.12,.025])test(`the complete musical rig contacts the floor
     assert.ok(rig.getPositions().every(Number.isFinite));
     assert.ok(rig.getCenter().toArray().every(Number.isFinite));
   }finally{rig.dispose();geometry.dispose();material.dispose();}
+});
+
+test('grab stiffness controls tracking speed and a fast drag retains throw momentum',()=>{
+  const errors=[];
+  for(const grabStiffness of [2,30,60]) {
+    const item=fixture({maxChains:8,minDepth:3,maxDepth:3},{gravity:0,grabStiffness,grabDamping:.75});
+    try {
+      const {rig}=item,link=rig.chains[0].links[0],center=()=>new Vector3().copy(link.body.getPosition()).divideScalar(rig.physicsScale);
+      const start=center();rig.beginDrag(link,start);let target;
+      for(let i=1;i<=12;i++) {
+        target=start.clone().add(new Vector3(i/12*4,i/12*2,0));rig.moveDrag(target);rig.step(1/60);
+      }
+      const held=center();errors.push(held.distanceTo(target));
+      if(grabStiffness>=30){
+        assert.ok(errors.at(-1)<.08,'A fast 4-unit sweep should stay close to the pointer');
+        assert.ok(link.body.getLinearVelocity().x/rig.physicsScale>15);
+      }
+      rig.endDrag();rig.step(1/60);
+      if(grabStiffness>=30)assert.ok(center().distanceTo(held)>.2,'Release must retain momentum');
+      // Repeated grabs, pause, and disposal must release temporary native handles.
+      for(let i=0;i<10;i++){assert.equal(rig.beginDrag(link,center()),true);rig.endDrag();}
+      rig.beginDrag(link,center());rig.configure({simulate:false});assert.equal(rig.dragging,false);
+      rig.configure({simulate:true,grabStiffness:20,grabDamping:1});rig.beginDrag(link,center());
+    }finally{item.dispose();}
+  }
+  assert.ok(errors[0]>errors[1]*10,'The stiffness slider must make a substantial difference');
+});
+
+test('grab damping controls overshoot and settles the held point',()=>{
+  const peaks=[];
+  for(const grabDamping of [0,2]){
+    const item=fixture({enabled:false},{gravity:0,linearDamping:0,grabStiffness:8,grabDamping});
+    try{
+      const {rig}=item;rig.beginDrag(rig.coreLink,new Vector3());rig.moveDrag(new Vector3(1,0,0));
+      let peak=0;for(let i=0;i<60;i++){rig.step(1/120);peak=Math.max(peak,rig.getCenter().x);}
+      peaks.push(peak);
+      if(grabDamping===2)assert.ok(Math.abs(rig.getCenter().x-1)<.001);
+    }finally{item.dispose();}
+  }
+  assert.ok(peaks[0]>1.5);assert.ok(peaks[1]<1.01);
 });

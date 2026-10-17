@@ -13,6 +13,7 @@ export function lightingControlsMarkup() {
     <details class="material-group" ${index === 0 ? "open" : ""}>
       <summary>${label}</summary>
       ${key === "directional" ? '<p class="camera-hint">Light offsets follow the center of the boxes.</p>' : ""}
+      ${key === "spotlight" ? '<p class="camera-hint">Position and aim follow the body. Offsets stay in world space, so the light remains overhead as the mesh rolls.</p>' : ""}
       ${key === "hemisphere" ? '<p class="camera-hint">Tilt: 0° overhead · 90° sideways · 180° below. Yaw turns the tilted direction around the scene.</p>' : ""}
       ${key === "environment" ? '<p class="camera-hint">Seven colored studio panels make the reflected bands. Roughness softens them. Intensity multiplies each material’s environment intensity; Rotation turns the reflection studio.</p>' : ""}
       ${key === "occlusion" ? '<p class="camera-hint">Adds contact shading between the boxes and their folds. AO only shows the shading on white. Disable for faster rendering.</p>' : ""}
@@ -26,7 +27,7 @@ export function lightingControlsMarkup() {
     </details>`).join("");
 }
 
-export function bindLightingControls(root, directional, hemisphere, materials, getMaterials, onChange, applyOcclusion, applySceneLighting = () => {}, initialLighting = defaultLighting()) {
+export function bindLightingControls(root, directional, hemisphere, materials, getMaterials, onChange, applyOcclusion, applySceneLighting = () => {}, initialLighting = defaultLighting(), spotlight) {
   const inputs = Object.fromEntries(lightingGroups.map(({ key, fields }) => [key,
     Object.fromEntries(fields.map(([name]) => [name, root.querySelector(`#lighting-${key}-${name}`)])),
   ]));
@@ -36,9 +37,11 @@ export function bindLightingControls(root, directional, hemisphere, materials, g
   const center = { x: 0, y: 0, z: 0 };
   function updatePosition(point) {
     center.x = point.x; center.y = point.y; center.z = point.z;
-    const { offsetX, height, offsetZ } = settings.directional;
-    directional.position.set(center.x + offsetX, center.y + height, center.z + offsetZ);
-    directional.target.position.set(center.x, center.y, center.z);
+    for (const [key, light] of [['directional', directional], ['spotlight', spotlight]]) if (light) {
+      const { offsetX, height, offsetZ } = settings[key];
+      light.position.set(center.x + offsetX, center.y + height, center.z + offsetZ);
+      light.target.position.set(center.x, center.y, center.z);
+    }
   }
   function refreshEnvironment() {
     const values = getMaterials();
@@ -65,6 +68,13 @@ export function bindLightingControls(root, directional, hemisphere, materials, g
     directional.shadow.radius = main.softness;
     directional.shadow.bias = main.shadowBias;
     directional.shadow.normalBias = main.normalBias;
+    if (spotlight) {
+      const spot = settings.spotlight;
+      spotlight.visible = spot.enabled; spotlight.color.set(spot.color); spotlight.intensity = spot.intensity;
+      spotlight.angle = spot.angle * Math.PI / 180; spotlight.penumbra = spot.penumbra;
+      spotlight.castShadow = spot.castShadow; spotlight.shadow.radius = spot.softness;
+      spotlight.shadow.bias = spot.shadowBias; spotlight.shadow.normalBias = spot.normalBias;
+    }
     hemisphere.visible = fill.enabled;
     hemisphere.color.set(fill.skyColor);
     hemisphere.groundColor.set(fill.groundColor);

@@ -98,13 +98,6 @@ export function createTileFloor(settings) {
   }
   configure(settings);
   return { mesh, configure, updatePosition,
-    configureEnvironment({ enabled, intensity, rotation }, map = null) {
-      for (const surface of [material, tileMaterial]) {
-        surface.envMap = map;
-        surface.envMapIntensity = enabled ? 0.5 * intensity : 0;
-        surface.envMapRotation.y = rotation * Math.PI / 180;
-      }
-    },
     dispose() { mesh.removeFromParent();tiles.dispose();tileGeometry.dispose();tileMaterial.dispose();mesh.geometry.dispose(); material.dispose(); for (const texture of textures) texture.dispose(); },
   };
 }

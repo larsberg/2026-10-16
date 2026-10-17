@@ -77,10 +77,14 @@ export function meshControlsMarkup() {
           <section id="panel-motion" role="tabpanel" aria-labelledby="tab-motion" hidden>
             <details class="material-group" open><summary>Bones &amp; colliders</summary>
               <p class="camera-hint">Each piece has one collider and bone per extrusion segment. Segment count and length come from the Mesh tab. Roots attach to the movable central body with cone-limited joints. Drag a piece to lift and move the whole form; drag empty space to orbit. Hover repels colliders, even with outlines hidden. Resizing or changing mesh layers rebuilds the rig.</p>
-              ${meshFields.rig.filter(([key]) => !key.startsWith('note')).map(field => fieldMarkup('rig', field)).join('')}
+              ${meshFields.rig.filter(([key]) => !key.startsWith('note') && !key.startsWith('grab')).map(field => fieldMarkup('rig', field)).join('')}
               <p class="camera-hint">Joint overlap puts each shared joint half a radius inside each neighboring capsule. At 1× their overlap is one radius; the base and tip keep their original positions.</p>
               <button type="button" data-mesh-action="nudgeRig">Nudge bone chains</button>
               <p class="rig-stats camera-hint"></p>
+            </details>
+            <details class="material-group" open><summary>Grab response</summary>
+              <p class="camera-hint">Stiffness makes the picked point follow faster. Lower damping adds spring and overshoot; around 1 settles without bouncing. The form keeps its momentum when released.</p>
+              ${meshFields.rig.filter(([key]) => key.startsWith('grab')).map(field => fieldMarkup('rig', field)).join('')}
             </details>
             <details class="material-group" open><summary>Music response</summary>
               <p class="camera-hint">Bass gets the largest 33% of chains (rounded to a whole chain). The remaining instruments share the rest evenly, ordered by register. Each note drives every chain in its instrument group. Note pushes lift and sway the pieces, with roots attached to the body; their strength is independent of note scaling.</p>
@@ -91,7 +95,7 @@ export function meshControlsMarkup() {
           </section>
           <section id="panel-audio" role="tabpanel" aria-labelledby="tab-audio" hidden>
             <p class="control-heading">Strudel</p>${fields('audio')}
-            <p class="camera-hint">Look No Further · generative study. 82 BPM, rounded sliding bass, dry drums, wiry guitar and a breathy low voice. The guitar enters after the opening groove; the voice enters with the low bass section. Enable audio to listen.</p>
+            <p class="camera-hint">Look No Further · evolving arrangement. Intact two- and four-bar sections are mixed into a changing sequence. Notes, instrument parts and phrasing stay as written; your tempo, sounds and effects still apply. Enable audio to listen.</p>
             <p class="camera-hint">While a piece is held, random notes from these instruments replace the song. Release to return to the song at its current position. Note density controls the intensity of the improvisation; instrument levels and effects still apply.</p>
             <p class="camera-hint march-audio-status" role="status">Composition ready · enable audio to listen.</p>
             <p class="control-heading">Instruments</p>

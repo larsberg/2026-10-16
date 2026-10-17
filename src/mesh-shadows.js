@@ -1,4 +1,4 @@
-import { Box3, Matrix4 } from 'three';
+import { Box3, Matrix4, Vector3 } from 'three';
 
 const bounds = new Box3(), lightSpace = new Matrix4();
 
@@ -13,6 +13,15 @@ export function fitMeshShadows(light, mesh) {
   lightSpace.multiplyMatrices(camera.matrixWorldInverse, mesh.matrixWorld);
   bounds.copy(mesh.geometry.boundingBox).applyMatrix4(lightSpace);
   const padding = Math.max(0.25, bounds.getSize(mesh.position.clone()).length() * 0.03);
+  if (light.isSpotLight) {
+    camera.near = Math.max(0.05, -bounds.max.z - padding);
+    // Keep the ground receiver in range as the object is thrown upward.
+    // Its illuminated footprint is much larger than the mesh's own bounds.
+    const floor = new Vector3(light.target.position.x, 0, light.target.position.z).applyMatrix4(camera.matrixWorldInverse);
+    camera.far = Math.max(camera.near + 1, -bounds.min.z + padding, -floor.z + light.position.y * 2 + 20);
+    camera.updateProjectionMatrix();
+    return;
+  }
   Object.assign(camera, { left: bounds.min.x - padding, right: bounds.max.x + padding,
     bottom: bounds.min.y - padding, top: bounds.max.y + padding,
     near: Math.max(0.01, -bounds.max.z - padding), far: Math.max(0.02, -bounds.min.z + padding) });

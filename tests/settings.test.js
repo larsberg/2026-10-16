@@ -40,3 +40,15 @@ test('production settings use the embedded setup and isolate device saves by URL
   assert.deepEqual(await requestStaticSetup(options),saved);
   assert.deepEqual(await requestStaticSetup({...options,url:'https://example.test/another/setup.json'}),bundledSetup);
 });
+
+test('grab and spotlight settings migrate once and retain independent saved controls',()=>{
+  const old=defaultMeshSetup();delete old.rig.grabStiffness;delete old.rig.grabDamping;delete old.lighting.spotlight;
+  old.lighting.directional.enabled=true;old.lighting.directional.color='#123456';
+  const migrated=validateMeshSetup(old);
+  assert.equal(migrated.rig.grabStiffness,30);assert.equal(migrated.rig.grabDamping,.75);
+  assert.equal(migrated.lighting.spotlight.enabled,true);assert.equal(migrated.lighting.spotlight.color,'#123456');
+  assert.equal(migrated.lighting.directional.enabled,false);
+  const custom=mergeMeshSetup(migrated,{rig:{grabStiffness:60,grabDamping:0},lighting:{spotlight:{enabled:false,angle:65},directional:{enabled:true}}});
+  assert.deepEqual(validateMeshSetup(custom),custom);
+  for(const patch of [{rig:{grabStiffness:0}},{rig:{grabDamping:3}},{lighting:{spotlight:{angle:90}}}])assert.throws(()=>mergeMeshSetup(custom,patch));
+});

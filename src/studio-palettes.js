@@ -35,6 +35,7 @@ export function studioColorKey(environment) {
 export function matchingStudioPalette(lighting) {
   return studioPalettes.find(p => studioColorKey(p.environment) === studioColorKey(lighting.environment)
     && p.directional.color === lighting.directional.color
+    && (!lighting.spotlight || p.directional.color === lighting.spotlight.color)
     && p.hemisphere.skyColor === lighting.hemisphere.skyColor
     && p.hemisphere.groundColor === lighting.hemisphere.groundColor)?.id ?? 'custom';
 }
@@ -43,5 +44,6 @@ export function applyStudioPalette(lighting, id) {
   const preset = studioPalettes.find(p => p.id === id);
   if (!preset) throw new Error('Unknown studio palette.');
   return { ...lighting, environment: { ...lighting.environment, ...preset.environment },
+    ...(lighting.spotlight ? { spotlight: { ...lighting.spotlight, color: preset.directional.color } } : {}),
     directional: { ...lighting.directional, ...preset.directional }, hemisphere: { ...lighting.hemisphere, ...preset.hemisphere } };
 }
