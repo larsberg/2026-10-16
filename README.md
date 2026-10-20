@@ -1,6 +1,6 @@
 # 2026-10-16
 
-Prepared for GitHub Pages at `https://larsberg.github.io/2026-10-16/`, with source repository `https://github.com/larsberg/2026-10-16`. These are publishing targets; the repository and Pages site still need to be created.
+Source repository: `https://github.com/larsberg/2026-10-16`. GitHub Pages: `https://larsberg.github.io/2026-10-16/`.
 
 A dodecahedron-based polygon mesh with n-sided face editing, bone-chain physics, and the metallic mesh finish from `2026-10-08-blobby`. A wireframe overlay is available in the controls.
 
@@ -105,15 +105,14 @@ To record, press **R** to start/stop, or use **H → Info → Record video & aud
 
 Run `npm run check` to run the silent Node tests and build `dist/`. The build includes `sketch.json`, `catalogue.json`, `site-entry.json`, `setup.json`, the thumbnail, bundled JavaScript/WASM, and `.nojekyll`. It requires no development server in production. Local Save writes `public/setup.json`; published Save stores settings on the viewer's device. Rebuild and republish after changing the default settings.
 
-For the first publication, create the public GitHub repository and connect this checkout (there is no `origin` yet):
+The public repository is owned by **larsberg**. Source lives on `main`; GitHub Pages publishes the built files from the root of `gh-pages`. To release an update after committing the source changes:
 
 ```sh
-gh repo create larsberg/2026-10-16 --public --source=. --remote=origin
+git push origin main
 npm run deploy
-gh api --method POST repos/larsberg/2026-10-16/pages -f 'source[branch]=gh-pages' -f 'source[path]=/'
 ```
 
-The last command enables Pages for the first time; GitHub Settings → Pages → Deploy from a branch → `gh-pages` / root does the same. Later releases only need `npm run deploy`, which runs tests and builds before pushing `dist/` to `gh-pages`. Commit and push source changes separately to retain the editable project on GitHub.
+`npm run deploy` runs tests and builds before pushing `dist/` to `gh-pages`. Commit and push source changes separately to retain the editable project on GitHub. Pages is configured in GitHub Settings → Pages → Deploy from a branch → `gh-pages` / root.
 
 Once the standalone URL is serving successfully, add the generated **`dist/site-entry.json`** object to the `sketches` array in **`../lasersite/content/sketches.json`**. That is the gallery's current editing source; the older hosted-manifest registration files are no longer read. The generated entry contains the ID/slug, title/date, exact thumbnail dimensions and alt text, absolute standalone/embed URLs, iframe permissions, technologies, and the same sidebar defaults as Blobby Buddies. It is regenerated from the manifest on every build, so those fields stay synchronized. If the entry is staged in the gallery before the runtime is live, set `hidden` to `true` until deployment is verified.
 
