@@ -1,0 +1,30 @@
+{
+  "id": "2026-10-16",
+  "title": "2026-10-16",
+  "slug": "2026-10-16",
+  "aliases": [],
+  "hidden": false,
+  "date": "2026-10-16",
+  "datePrecision": "day",
+  "thumbnail": {
+    "src": "https://larsberg.github.io/2026-10-16/thumbnail.png",
+    "width": 1189,
+    "height": 699,
+    "alt": "A faceted form with pale blue, copper, and cream articulated limbs casting long shadows across a tiled floor."
+  },
+  "runtimeUrl": "https://larsberg.github.io/2026-10-16/?embed=1",
+  "standaloneUrl": "https://larsberg.github.io/2026-10-16/",
+  "iframeAllow": "autoplay; fullscreen",
+  "madeWith": [
+    "threejs",
+    "box3d",
+    "strudel",
+    "web-audio"
+  ],
+  "sidebarPattern": "waves",
+  "sidebarTone": "dark",
+  "sidebar": {
+    "textColor": "#ffffff",
+    "backgroundColor": "#000000af"
+  }
+}

@@ -1,0 +1,424 @@
+{
+  "version": 1,
+  "sketch": "2026-10-16",
+  "materials": {
+    "mesh": {
+      "metalness": 0.88,
+      "roughness": 0.37,
+      "emissiveIntensity": 0,
+      "envMapIntensity": 1,
+      "opacity": 1,
+      "color": "#ffffff",
+      "emissive": "#ffffff",
+      "wireframe": false,
+      "flatShading": true,
+      "normalMix": 0.13
+    },
+    "text": {
+      "metalness": 0,
+      "roughness": 1,
+      "emissiveIntensity": 0,
+      "envMapIntensity": 0,
+      "opacity": 1,
+      "color": "#000000",
+      "emissive": "#ffffff",
+      "wireframe": false,
+      "flatShading": false
+    }
+  },
+  "lighting": {
+    "spotlight": {
+      "enabled": true,
+      "color": "#ffdbb4",
+      "intensity": 600,
+      "offsetX": -3,
+      "height": 8,
+      "offsetZ": 4,
+      "angle": 50,
+      "penumbra": 0.5,
+      "castShadow": true,
+      "softness": 3,
+      "shadowBias": -0.0001,
+      "normalBias": 0.025
+    },
+    "directional": {
+      "enabled": false,
+      "color": "#ffdbb4",
+      "intensity": 2.6,
+      "offsetX": -3,
+      "height": 7,
+      "offsetZ": 4,
+      "castShadow": false,
+      "softness": 3,
+      "shadowBias": -0.0003,
+      "normalBias": 0.025
+    },
+    "hemisphere": {
+      "enabled": true,
+      "skyColor": "#80ddd9",
+      "groundColor": "#4e302b",
+      "intensity": 0.29,
+      "yaw": 0,
+      "tilt": 0
+    },
+    "environment": {
+      "enabled": true,
+      "intensity": 1,
+      "rotation": 0,
+      "backgroundColor": "#101c20",
+      "keyColor": "#ff914e",
+      "stripColor": "#fff0d6",
+      "fillColor": "#087f8c",
+      "rimColor": "#51d4cc",
+      "accentColor": "#d3584b",
+      "bounceColor": "#e1ac69",
+      "backColor": "#4c6f78"
+    },
+    "occlusion": {
+      "enabled": false,
+      "intensity": 2.54,
+      "radius": 1.75,
+      "aoOnly": false
+    }
+  },
+  "info": {
+    "upperLeft": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "attrs": {
+            "textAlign": "left"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "LARS BERG"
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "attrs": {
+            "textAlign": "left",
+            "level": 1
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "2026-10-16"
+            }
+          ]
+        }
+      ]
+    },
+    "upperRight": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "attrs": {
+            "textAlign": "right"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "N-sided mesh / articulated motion."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "attrs": {
+            "textAlign": "right"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Drag a piece to pull and throw."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "attrs": {
+            "textAlign": "right"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Drag the background to orbit."
+            }
+          ]
+        }
+      ]
+    },
+    "lowerLeft": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "attrs": {
+            "textAlign": "left"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "audio based on:"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "attrs": {
+            "textAlign": "left"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Look No Further",
+              "marks": [
+                {
+                  "type": "bold"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "attrs": {
+            "textAlign": "left"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "by SUUNS"
+            }
+          ]
+        }
+      ]
+    },
+    "lowerRight": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "attrs": {
+            "textAlign": "right"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Three.js"
+            },
+            {
+              "type": "hardBreak"
+            },
+            {
+              "type": "text",
+              "text": "Box3D"
+            },
+            {
+              "type": "hardBreak"
+            },
+            {
+              "type": "text",
+              "text": "Strudel"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "mesh": {
+    "radius": 1.4
+  },
+  "pipeline": {
+    "enabled": true,
+    "initialDiamondDualEnabled": true,
+    "seed": 1,
+    "triangulateEnabled": true,
+    "faceCenterDualEnabled": true,
+    "averageVerticesEnabled": true,
+    "insetEnabled": true,
+    "insetScale": 0.97,
+    "extrusionEnabled": true,
+    "maxChains": 18,
+    "excludeInitialBorderTriangles": true,
+    "minDepth": 1.66,
+    "maxDepth": 4.78,
+    "segmentLength": 0.99,
+    "subdivisionEnabled": false,
+    "subdivisionIterations": 1,
+    "diamondDualEnabled": true,
+    "hexelateTriangulateEnabled": false,
+    "hexelateEnabled": true,
+    "finalAverageVerticesEnabled": false
+  },
+  "editing": {
+    "selectedOnly": false
+  },
+  "rig": {
+    "enabled": true,
+    "simulate": true,
+    "gravity": 59.8,
+    "coneAngle": 28,
+    "twistAngle": 65,
+    "jointOverlap": 0.39,
+    "linearDamping": 0,
+    "angularDamping": 0,
+    "grabStiffness": 30,
+    "grabDamping": 0.75,
+    "hoverEnabled": false,
+    "hoverAcceleration": 0,
+    "density": 0.5,
+    "showBones": false,
+    "showJoints": false,
+    "showColliders": false,
+    "noteScaleEnabled": true,
+    "noteScaleMin": 0.38,
+    "noteScaleMax": 1.2,
+    "noteScaleAmount": 0.5,
+    "noteWeightMin": 0.66,
+    "noteWeightMax": 1,
+    "noteAttack": 0.14,
+    "noteRelease": 0.3,
+    "notePushEnabled": true,
+    "notePushStrength": 1.3
+  },
+  "extrusion": {
+    "offsetX": 0,
+    "offsetY": 0,
+    "depth": 0.5,
+    "rotateX": 0,
+    "rotateY": 0,
+    "rotateZ": 0,
+    "scaleX": 1,
+    "scaleY": 1
+  },
+  "audio": {
+    "enabled": true,
+    "bpm": 82,
+    "volume": 0.5,
+    "drums": 0.9,
+    "bass": 0.85,
+    "keys": 0.55,
+    "melody": 0.8,
+    "dragChaosEnabled": true,
+    "dragChaosRate": 32,
+    "instruments": {
+      "kick": {
+        "sound": "suuns-kick",
+        "level": 1,
+        "decay": 1,
+        "cutoff": 5000,
+        "resonance": 0.45,
+        "drive": 0,
+        "reverb": 0,
+        "delay": 0,
+        "delayBeats": 0.5,
+        "feedback": 0.3
+      },
+      "snare": {
+        "sound": "suuns-snare",
+        "level": 1,
+        "decay": 1,
+        "cutoff": 6500,
+        "resonance": 0.45,
+        "drive": 0,
+        "reverb": 0.035,
+        "delay": 0,
+        "delayBeats": 0.5,
+        "feedback": 0.3
+      },
+      "hat": {
+        "sound": "suuns-hat",
+        "level": 0.8,
+        "decay": 1,
+        "cutoff": 10000,
+        "resonance": 0.45,
+        "drive": 0,
+        "reverb": 0.02,
+        "delay": 0,
+        "delayBeats": 0.5,
+        "feedback": 0.3
+      },
+      "bass": {
+        "sound": "suuns-bass",
+        "level": 0.5,
+        "decay": 1.04,
+        "cutoff": 1500,
+        "resonance": 0.45,
+        "drive": 0.11,
+        "reverb": 0.02,
+        "delay": 0,
+        "delayBeats": 0.5,
+        "feedback": 0.3
+      },
+      "keys": {
+        "sound": "electric",
+        "level": 1,
+        "decay": 1.86,
+        "cutoff": 390,
+        "resonance": 1.05,
+        "drive": 0.19,
+        "reverb": 0.25,
+        "delay": 0.16,
+        "delayBeats": 1.375,
+        "feedback": 0.32
+      },
+      "melody": {
+        "sound": "vowel",
+        "level": 0.46,
+        "decay": 1.74,
+        "cutoff": 5000,
+        "resonance": 5.35,
+        "drive": 0,
+        "reverb": 0.52,
+        "delay": 0.55,
+        "delayBeats": 1,
+        "feedback": 0.3
+      }
+    }
+  },
+  "appearance": {
+    "wireframeColor": "#ffffff"
+  },
+  "floor": {
+    "roughness": 0.02,
+    "depth": 0.004,
+    "tileSize": 2.4,
+    "color": "#ffffff"
+  },
+  "fog": {
+    "enabled": false,
+    "color": "#101c20",
+    "near": 10,
+    "far": 30
+  },
+  "infoLayout": {
+    "size": 3,
+    "column": -1,
+    "row": -1
+  },
+  "camera": {
+    "follow": true,
+    "optimizedTextures": false,
+    "followSmoothing": 0.45,
+    "yaw": 162.006944726,
+    "elevation": 12.3571992659,
+    "distance": 14.385490025,
+    "offsetX": 0,
+    "offsetY": 0,
+    "offsetZ": 0,
+    "fov": 42
+  },
+  "visibility": {
+    "surface": true,
+    "wireframe": false,
+    "ground": true,
+    "fps": false,
+    "text": true
+  }
+}

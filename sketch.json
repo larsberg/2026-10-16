@@ -1,0 +1,65 @@
+{
+  "id": "2026-10-16",
+  "title": "2026-10-16",
+  "created": "2026-10-16",
+  "entry": "./",
+  "protocol": "sketch-player:v1",
+  "capabilities": [
+    "play",
+    "pause",
+    "reset",
+    "get-setup",
+    "setup",
+    "save-setup",
+    "load-setup"
+  ],
+  "sound": "gesture-required",
+  "description": "An articulated dodecahedron with n-sided extrusions, musical bone chains, and a changing arrangement of synthesized SUUNS-inspired phrases. Drag and throw it under a following spotlight.",
+  "schemaVersion": 1,
+  "date": "2026-10-16",
+  "datePrecision": "day",
+  "author": "Lars Berg",
+  "tags": [
+    "threejs",
+    "mesh",
+    "ngons",
+    "physics",
+    "constraints",
+    "strudel",
+    "interactive"
+  ],
+  "madeWith": [
+    "threejs",
+    "box3d",
+    "strudel",
+    "web-audio"
+  ],
+  "audio": "gesture-required",
+  "thumbnail": {
+    "src": "./thumbnail.png",
+    "width": 1189,
+    "height": 699,
+    "alt": "A faceted form with pale blue, copper, and cream articulated limbs casting long shadows across a tiled floor."
+  },
+  "embed": {
+    "src": "./?embed=1",
+    "allow": [
+      "autoplay",
+      "fullscreen"
+    ],
+    "resize": "container",
+    "controls": [
+      "play",
+      "pause",
+      "reset",
+      "get-setup",
+      "setup",
+      "save-setup",
+      "load-setup"
+    ],
+    "protocol": "sketch-player:v1",
+    "parentOriginParameter": "parentOrigin"
+  },
+  "repository": "https://github.com/larsberg/2026-10-16",
+  "url": "https://larsberg.github.io/2026-10-16/"
+}
