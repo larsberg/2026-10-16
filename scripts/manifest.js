@@ -26,6 +26,29 @@ export function catalogueEntry(manifest) {
   };
 }
 
+// The gallery now edits content/sketches.json, independently of sketch.json.
+// Generate its ready-to-add entry from the same metadata used by the player.
+export function siteEntry(manifest) {
+  const base = new URL(manifest.url);
+  return {
+    id: manifest.id,
+    title: manifest.title,
+    slug: manifest.id,
+    aliases: [],
+    hidden: false,
+    date: manifest.date,
+    datePrecision: manifest.datePrecision,
+    thumbnail: { ...manifest.thumbnail, src: new URL(manifest.thumbnail.src, base).href },
+    runtimeUrl: new URL(manifest.embed.src, base).href,
+    standaloneUrl: new URL(manifest.entry, base).href,
+    iframeAllow: manifest.embed.allow.join('; '),
+    madeWith: manifest.madeWith,
+    sidebarPattern: 'waves',
+    sidebarTone: 'dark',
+    sidebar: { textColor: '#ffffff', backgroundColor: '#000000af' },
+  };
+}
+
 export function resolveEntry(entry, documentUrl) {
   validateManifest(entry);
   const resolve = relative => {

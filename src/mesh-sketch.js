@@ -8,6 +8,7 @@ import { createMeshView } from './mesh-view.js';
 import { initMeshRigPhysics } from './mesh-rig.js';
 import { createStartupGate } from "./startup.js";
 import { bindThumbnailCapture } from "./thumbnail-controls.js";
+import { bindRecordingControls } from './recording-controls.js';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { createFaceMetal, createStudioEnvironment } from './face-metal.js';
@@ -30,7 +31,7 @@ import { applyCameraView, captureCameraOrbit, captureCameraView, configureOrbitI
 import './style.css';
 import './mesh-style.css';
 
-export async function mountMesh(root,{ui=true}={}) {
+export async function mountMesh(root,{ui=false}={}) {
   const startup = createStartupGate(root);
   const shell=document.createElement('section');shell.className='sketch';
   shell.innerHTML=meshControlsMarkup();
@@ -72,6 +73,7 @@ export async function mountMesh(root,{ui=true}={}) {
   const composition=createArrangedScore();
   views.setNotePalette(notePaletteForPattern(composition));
   const marchAudio=createMarchAudio({pattern:composition,canPlay:()=>running&&!document.hidden,onStatus:message=>{audioStatus.textContent=message;}});
+  const recording=bindRecordingControls(shell,renderer.domElement,marchAudio);
   const paletteMotion=createCompositionPalette({environment,scene,sun,hemisphere,spotlight,lighting:settings.lighting});
   const setupAbort=new AbortController(),followTarget=new THREE.Vector3(),worldOrigin=new THREE.Vector3();
   const groupCenter=()=>views.getCenter(followTarget);
@@ -258,13 +260,13 @@ export async function mountMesh(root,{ui=true}={}) {
     views.update(dt,running);
     lightingControls.updatePosition(groupCenter());
     for(const light of [sun,spotlight])if(light.visible&&light.castShadow)fitMeshShadows(light,views.surface?.mesh);
-    effects.render();startup.reveal();stats?.update();
+    effects.render();recording.recorder.captureFrame();startup.reveal();stats?.update();
   });
   const thumbnailCapture = import.meta.env.DEV ? bindThumbnailCapture(shell, renderer.domElement, () => effects.render()) : null;
   const api={play,pause(){focus.cancelResume();pause();},reset,setup:apply,getSetup,saveSetup,loadSetup,getState:()=>({running,audio:marchAudio.playing,faces:views.topology?.faces.length??0}),
     editMesh:meshAction,audio:marchAudio,setComposition(pattern){const palette=notePaletteForPattern(pattern);views.setNotePalette(palette);return marchAudio.setPattern(pattern);},paletteMotion,scene,
-    get mesh(){return views;},environment,renderer,camera,controls,colliderDrag,
-    dispose(){disposed=true;startup.dispose();renderer.setAnimationLoop(null);setupAbort.abort();unbindAudio();marchAudio.dispose();focus.dispose();resize.disconnect();faceSelection.dispose();controls.removeEventListener('start',startOrbit);controls.removeEventListener('end',endOrbit);controls.dispose();panel.dispose();infoControls.dispose();thumbnailCapture?.dispose(); effects.dispose();stats?.dom.remove();
+    get mesh(){return views;},environment,renderer,camera,controls,colliderDrag,recording:recording.recorder,
+    dispose(){disposed=true;startup.dispose();renderer.setAnimationLoop(null);setupAbort.abort();unbindAudio();recording.dispose();marchAudio.dispose();focus.dispose();resize.disconnect();faceSelection.dispose();controls.removeEventListener('start',startOrbit);controls.removeEventListener('end',endOrbit);controls.dispose();panel.dispose();infoControls.dispose();thumbnailCapture?.dispose(); effects.dispose();stats?.dom.remove();
       colliderDrag.dispose();colliderHover.dispose();views.dispose();meshMaterial.dispose();tileFloor.dispose();
       const geometries=new Set(),materials=new Set();scene.traverse(object=>{if(object.geometry)geometries.add(object.geometry);if(object.material)materials.add(object.material);});
       geometries.delete(textProp.mesh.geometry);materials.delete(textProp.material);textProp.dispose();geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());environment.dispose();sun.shadow.dispose();spotlight.shadow.dispose();renderer.dispose();shell.remove();if(window.__meshSketch===api)delete window.__meshSketch;

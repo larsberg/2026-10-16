@@ -1,5 +1,7 @@
 # 2026-10-16
 
+Prepared for GitHub Pages at `https://larsberg.github.io/2026-10-16/`, with source repository `https://github.com/larsberg/2026-10-16`. These are publishing targets; the repository and Pages site still need to be created.
+
 A dodecahedron-based polygon mesh with n-sided face editing, bone-chain physics, and the metallic mesh finish from `2026-10-08-blobby`. A wireframe overlay is available in the controls.
 
 ```sh
@@ -9,7 +11,7 @@ npm run dev
 
 Open `http://127.0.0.1:1234/`. `npm run check` runs silent Node tests and a production build.
 
-The drawer, tabs, fields, Save/Reload API, studio settings, info editor, player bridge, and Three.js perspective camera with OrbitControls come from `2026-10-13`. The starting camera frames the free-moving body above a visible ground plane. Info remains available, initially hidden. Box3D `0.2.0` supplies rigid-body bone chains using the cone-joint approach from `2026-09-25-rectaspinulator`. There is no soft-body simulation.
+The drawer, tabs, fields, Save/Reload API, studio settings, info editor, player bridge, and Three.js perspective camera with OrbitControls come from `2026-10-13`. The starting camera frames the free-moving body above a visible ground plane. The Blobby-style framed ground info panel is visible and reads from the four rich-text Info fields. Its date, description, SUUNS credit, and technology credits are editable through the same settings system. Box3D `0.2.0` supplies rigid-body bone chains using the cone-joint approach from `2026-09-25-rectaspinulator`. There is no soft-body simulation.
 
 **Mesh → Dodecahedron radius** ranges from **0.5–4**, defaults to **2**, and persists as `mesh.radius` through the same CMS/settings system. The starting mesh has **12 pentagons, 20 shared vertices, and 30 edges**. It is closed, with no border. Older grid saves migrate to the dodecahedron, enable the ground, and frame the body while retaining the existing material, audio, and operation settings.
 
@@ -89,3 +91,30 @@ Manual editing controls persist through the existing settings system as `editing
 `window.__meshSketch.mesh` exposes `selectFaces(ids)`, `selectedFaces`, `triangulate(ids?, { random }?)`, `dualDiamond()`, `dualNSided()`, `extrude(ids?, transform?, { segments }?)`, and `undo()`. Omitting face IDs means all faces; an empty list means none. Extrusion accepts an invertible affine Three.js `Matrix4` in each face's local frame, or a callback `(faceId, frame) => matrix` for per-face transforms. `extrusionTransform(options)` in `src/mesh-operations.js` creates the same transform used by the controls. Pure operations in that module return `{ mesh, faceIds }`, where `faceIds` identifies resulting triangles or extrusion caps. The operations preserve their input mesh. The optional `segments` argument accepts an integer or a callback `(faceId, frame) => integer`; procedural extrusion uses this callback for the amount-derived segment count.
 
 The pure operation `subdivideSmooth(mesh, selectedIds?, { iterations }?)` refines the whole mesh and propagates the supplied selection to child faces. Its `sourceFaces` array maps each resulting face back to its input face. Subdividing the whole surface keeps adjacent faces connected even when only caps are selected.
+
+
+Controls start fully hidden, including the drawer button and frame-rate meter. Press **H** to show or hide them, or open `?ui=1` to show the drawer button. The same behavior applies to the embedded player.
+
+To record, press **R** to start/stop, or use **H → Info → Record video & audio**. After stopping, click **Download video**. The recorder captures only the rendered canvas and the sketch's final stereo audio output after effects, volume, compression and limiting. Enable audio first to include the song. No microphone or screen-sharing permission is needed. It selects MP4/H.264/AAC when supported and otherwise WebM/VP9 or VP8 with Opus. Choose a target of 30 or 60 fps; actual frame rate follows rendering performance. The long side is capped at 1920 pixels, and the initial recording dimensions remain fixed across window resizes. Controls and the recording badge are excluded. Hiding the tab ends the clip; a 256 MB cap bounds in-memory buffering. Clips stay local and are not uploaded. A six-second recording from the shared VS Code tab was checked with FFmpeg: H.264 video, stereo 48 kHz AAC audio, and matching audio/video durations.
+
+## Publishing and gallery data
+
+`public/sketch.json` is the metadata source: title, creation date, author, description, tags, technologies, audio gesture requirement, thumbnail, repository, standalone URL, and the `sketch-player:v1` embed contract. The title remains **2026-10-16**, dated **October 16, 2026**. Change the title here before building if it gets a name later.
+
+`public/thumbnail.png` is the supplied **1189 × 699** image, preserved unchanged. The build uses it for both the gallery thumbnail and Open Graph/Twitter previews. `index.html` receives the full social metadata, canonical URL, and a link to `sketch.json` at build time.
+
+Run `npm run check` to run the silent Node tests and build `dist/`. The build includes `sketch.json`, `catalogue.json`, `site-entry.json`, `setup.json`, the thumbnail, bundled JavaScript/WASM, and `.nojekyll`. It requires no development server in production. Local Save writes `public/setup.json`; published Save stores settings on the viewer's device. Rebuild and republish after changing the default settings.
+
+For the first publication, create the public GitHub repository and connect this checkout (there is no `origin` yet):
+
+```sh
+gh repo create larsberg/2026-10-16 --public --source=. --remote=origin
+npm run deploy
+gh api --method POST repos/larsberg/2026-10-16/pages -f 'source[branch]=gh-pages' -f 'source[path]=/'
+```
+
+The last command enables Pages for the first time; GitHub Settings → Pages → Deploy from a branch → `gh-pages` / root does the same. Later releases only need `npm run deploy`, which runs tests and builds before pushing `dist/` to `gh-pages`. Commit and push source changes separately to retain the editable project on GitHub.
+
+Once the standalone URL is serving successfully, add the generated **`dist/site-entry.json`** object to the `sketches` array in **`../lasersite/content/sketches.json`**. That is the gallery's current editing source; the older hosted-manifest registration files are no longer read. The generated entry contains the ID/slug, title/date, exact thumbnail dimensions and alt text, absolute standalone/embed URLs, iframe permissions, technologies, and the same sidebar defaults as Blobby Buddies. It is regenerated from the manifest on every build, so those fields stay synchronized. If the entry is staged in the gallery before the runtime is live, set `hidden` to `true` until deployment is verified.
+
+The gallery entry's runtime URL is `https://larsberg.github.io/2026-10-16/?embed=1`. The gallery appends `parentOrigin` for its cross-origin player messages. Play, pause, reset, and setup/save/load use the existing bridge; audio requires a user gesture. Controls start hidden; **H** reveals them. Gallery publishing is separate from publishing this sketch.

@@ -13,8 +13,8 @@
     "save-setup",
     "load-setup"
   ],
-  "sound": "none",
-  "description": "A viewport-sized polygon mesh drawn as a wireframe, ready for n-sided face editing.",
+  "sound": "gesture-required",
+  "description": "An articulated dodecahedron with n-sided extrusions, musical bone chains, and a changing arrangement of synthesized SUUNS-inspired phrases. Drag and throw it under a following spotlight.",
   "schemaVersion": 1,
   "date": "2026-10-16",
   "datePrecision": "day",
@@ -23,21 +23,23 @@
     "threejs",
     "mesh",
     "ngons",
-    "wireframe",
+    "physics",
+    "constraints",
     "strudel",
     "interactive"
   ],
   "madeWith": [
     "threejs",
+    "box3d",
     "strudel",
     "web-audio"
   ],
-  "audio": "none",
+  "audio": "gesture-required",
   "thumbnail": {
-    "src": "./thumbnail.svg",
-    "width": 1200,
-    "height": 900,
-    "alt": "Wireframe grid of nearly square polygon faces."
+    "src": "./thumbnail.png",
+    "width": 1189,
+    "height": 699,
+    "alt": "A faceted form with pale blue, copper, and cream articulated limbs casting long shadows across a tiled floor."
   },
   "embed": {
     "src": "./?embed=1",
@@ -57,5 +59,7 @@
     ],
     "protocol": "sketch-player:v1",
     "parentOriginParameter": "parentOrigin"
-  }
+  },
+  "repository": "https://github.com/larsberg/2026-10-16",
+  "url": "https://larsberg.github.io/2026-10-16/"
 }

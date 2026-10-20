@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { validateManifest } from './manifest.js';
+import { siteEntry, validateManifest } from './manifest.js';
 import { withSocialMetadata } from './social-metadata.js';
 
 // Keep the app's existing bundled assets; add the same player metadata and
@@ -34,6 +34,7 @@ export function pagesPlugin() {
       this.emitFile({ type: 'asset', fileName: 'catalogue.json', source: JSON.stringify({
         schemaVersion: 1, title: manifest.title, sketches: [{ ...manifest, manifest: './sketch.json' }],
       }, null, 2) + '\n' });
+      this.emitFile({ type: 'asset', fileName: 'site-entry.json', source: JSON.stringify(siteEntry(manifest), null, 2) + '\n' });
       this.emitFile({ type: 'asset', fileName: '.nojekyll', source: '' });
     },
   };

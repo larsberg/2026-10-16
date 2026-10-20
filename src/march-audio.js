@@ -14,6 +14,7 @@ export function createMarchAudio({now=()=>performance.now()/1000,canPlay=()=>tru
   let visualEvents=[],section;
   let dragging=false,chaosCursor=0,chaosSequence=0;
   const delivered=new Map();
+  const recordingOutputs=new Set();
   const active=()=>!disposed&&clock.running&&settings.enabled&&canPlay();
   function status(message){onStatus(message);}
   function stop(){operation++;playing=false;visualEvents=[];clearTimer(timer);timer=undefined;voices?.stop();
@@ -96,11 +97,26 @@ export function createMarchAudio({now=()=>performance.now()/1000,canPlay=()=>tru
   }
   function releaseContext(){
     stop();if(usingAudioClock){clock.useClock(now);usingAudioClock=false;}
+    for(const output of [...recordingOutputs])output.dispose();
     const previous=context;previous?.removeEventListener('statechange',contextChanged);
     voices?.dispose();master?.disconnect();compressor?.disconnect();limiter?.disconnect();context=voices=master=compressor=limiter=undefined;graphFault=false;
     if(previous&&previous.state!=='closed')previous.close().catch(()=>{});
   }
   return {retry,
+    async createRecordingOutput(){
+      if(disposed)throw new Error('Audio has been closed.');
+      if(context?.state==='closed'||graphFault)releaseContext();
+      if(!context)initialize();
+      const destination=context.createMediaStreamDestination(),source=limiter;
+      source.connect(destination);
+      let released=false;
+      const output={stream:destination.stream,enabled:settings.enabled&&settings.volume>0,
+        dispose(){if(released)return;released=true;source.disconnect(destination);destination.disconnect();
+          destination.stream.getTracks().forEach(track=>track.stop());recordingOutputs.delete(output);}};
+      recordingOutputs.add(output);
+      try{if(context.state!=='running')await context.resume();return output;}
+      catch(error){output.dispose();throw error;}
+    },
     setDragging(value){
       const next=!!value;if(next===dragging)return;dragging=next;
       voices?.stop();visualEvents=[];delivered.clear();cursor=clock.beat;chaosCursor=context?.currentTime??0;section=undefined;

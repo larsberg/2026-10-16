@@ -6,7 +6,7 @@ import {validateManifest} from './manifest.js';
 
 const root=process.cwd(),dist=path.join(root,'dist');
 const manifest=validateManifest(JSON.parse(fs.readFileSync(path.join(dist,'sketch.json'))));
-for(const name of ['index.html',manifest.thumbnail.src,'catalogue.json','.nojekyll'])
+for(const name of ['index.html',manifest.thumbnail.src,'catalogue.json','site-entry.json','.nojekyll'])
   if(!fs.existsSync(path.join(dist,name)))throw new Error(`Incomplete build: ${name}`);
 const origin=execFileSync('git',['remote','get-url','origin'],{encoding:'utf8'}).trim();
 if(origin.replace(/\.git$/,'')!==manifest.repository)throw new Error('Origin differs from sketch metadata.');

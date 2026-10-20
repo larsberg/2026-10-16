@@ -3,6 +3,7 @@ import { lightingControlsMarkup } from './lighting-controls.js';
 import { infoControlsMarkup } from './info-controls.js';
 import { meshFields } from './mesh-settings.js';
 import { instrumentControlsMarkup, bindInstrumentControls } from './instrument-controls.js';
+import { recordingControlsMarkup } from './recording-controls.js';
 
 const icon = path => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"/></svg>`;
 const paths = {
@@ -116,6 +117,7 @@ export function meshControlsMarkup() {
             ${meshFields.camera.filter(([, , value]) => typeof value === 'boolean').map(field => fieldMarkup('camera', field)).join('')}<div class="camera-controls">${meshFields.camera.filter(([, , value]) => typeof value !== 'boolean').map(field => fieldMarkup('camera', field)).join('')}</div><button class="reset-camera">Reset camera</button>
           </section>
           <section id="panel-info" role="tabpanel" aria-labelledby="tab-info" hidden>
+            ${recordingControlsMarkup()}
             <p class="control-heading">Tile placement</p><div class="camera-controls">${fields('infoLayout')}</div>
             <p class="camera-hint">The square frame spans whole tiles. Column and row place its upper-left corner on the floor grid. Placement follows the tile size and is included when you save settings.</p>
             ${infoControlsMarkup()}
@@ -129,6 +131,7 @@ export function bindMeshControls(shell, { ui, change, playPause, reset, resetCam
   const query = selector => shell.querySelector(selector);
   const drawer = query('.control-panel'), toggle = query('.drawer-toggle');
   toggle.hidden = !ui; toggle.disabled = !ui; drawer.inert = !ui;
+  shell.classList.toggle('controls-visible', ui);
   function toggleDrawer(open) {
     if (!ui) return;
     drawer.hidden = !open;
@@ -139,6 +142,13 @@ export function bindMeshControls(shell, { ui, change, playPause, reset, resetCam
   }
   toggle.addEventListener('click', () => toggleDrawer(drawer.hidden));
   const keydown = event => {
+    if (event.code === 'KeyH' && !event.repeat && !event.metaKey && !event.ctrlKey && !event.altKey && !event.target.closest?.('input,textarea,select,[contenteditable="true"]')) {
+      ui = !ui; toggle.hidden = !ui; toggle.disabled = !ui; drawer.inert = !ui;
+      shell.classList.toggle('controls-visible', ui);
+      if (ui) toggleDrawer(true);
+      else { drawer.hidden = true; toggle.setAttribute('aria-expanded', 'false'); shell.querySelector('.scene-canvas').focus({ preventScroll: true }); }
+      event.preventDefault(); return;
+    }
     if (event.key === 'Escape' && !drawer.hidden) { toggleDrawer(false); event.preventDefault(); }
   };
   document.addEventListener('keydown', keydown);

@@ -86,6 +86,18 @@
       "type": "doc",
       "content": [
         {
+          "type": "paragraph",
+          "attrs": {
+            "textAlign": "left"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "LARS BERG"
+            }
+          ]
+        },
+        {
           "type": "heading",
           "attrs": {
             "textAlign": "left",
@@ -111,7 +123,31 @@
           "content": [
             {
               "type": "text",
-              "text": "Mesh generation / n-sided faces."
+              "text": "N-sided mesh / articulated motion."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "attrs": {
+            "textAlign": "right"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Drag a piece to pull and throw."
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "attrs": {
+            "textAlign": "right"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Drag the background to orbit."
             }
           ]
         }
@@ -128,7 +164,36 @@
           "content": [
             {
               "type": "text",
-              "text": "Viewport grid / wireframe."
+              "text": "audio based on:"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "attrs": {
+            "textAlign": "left"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Look No Further",
+              "marks": [
+                {
+                  "type": "bold"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "attrs": {
+            "textAlign": "left"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "by SUUNS"
             }
           ]
         }
@@ -145,7 +210,21 @@
           "content": [
             {
               "type": "text",
-              "text": "Lars Berg / 2026-10-16"
+              "text": "Three.js"
+            },
+            {
+              "type": "hardBreak"
+            },
+            {
+              "type": "text",
+              "text": "Box3D"
+            },
+            {
+              "type": "hardBreak"
+            },
+            {
+              "type": "text",
+              "text": "Strudel"
             }
           ]
         }
@@ -340,6 +419,6 @@
     "wireframe": false,
     "ground": true,
     "fps": false,
-    "text": false
+    "text": true
   }
 }

@@ -4,6 +4,7 @@ import { validateInfo } from './info-settings.js';
 import { browserStorage, requestStaticSetup } from './static-setup.js';
 import { DEFAULT_FOLLOW_SMOOTHING, MIN_CAMERA_DISTANCE } from './camera.js';
 import { validateInstruments, mergeInstruments } from './instrument-settings.js';
+import { meshInfo } from './mesh-info.js';
 import { referenceAudioSettings } from './reference-audio-settings.js';
 
 export const meshFields = {
@@ -122,7 +123,7 @@ export const meshFields = {
     ['wireframe', 'Mesh wireframe', false],
     ['ground', 'Ground plane', true],
     ['fps', 'Show frame-rate meter', false],
-    ['text', 'Text prop', false],
+    ['text', 'Info panel', true],
   ],
 };
 
@@ -134,10 +135,8 @@ export function defaultMeshSetup() {
   Object.assign(lighting.hemisphere, { skyColor: '#8bc7ff', groundColor: '#51303b', intensity: 0.7 });
   // Keep occlusion optional; surface lighting and studio reflections are active.
   lighting.occlusion.enabled = false;
-  const text = (content, align = 'left', heading = false) => ({ type: 'doc', content: [{ type: heading ? 'heading' : 'paragraph', attrs: { textAlign: align, ...(heading ? { level: 1 } : {}) }, content: [{ type: 'text', text: content }] }] });
   const result = { version: 1, sketch: '2026-10-16', materials: defaultMaterials(), lighting,
-    info: { upperLeft: text('2026-10-16', 'left', true), upperRight: text('Mesh generation / n-sided faces.', 'right'),
-      lowerLeft: text('Dodecahedron / articulated mesh.'), lowerRight: text('Lars Berg / 2026-10-16', 'right') },
+    info: structuredClone(meshInfo),
     ...Object.fromEntries(Object.entries(meshFields).map(([group, fields]) => [group, Object.fromEntries(fields.map(([key, , value]) => [key, value]))])) };
   Object.assign(result.audio, referenceAudioSettings());
   return result;

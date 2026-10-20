@@ -16,7 +16,7 @@ if (params.get("embed") === "1") {
 }
 async function start() {
   const sketch = await mountMesh(document.querySelector("#sketch-root"), {
-    ui: !["false", "0"].includes(params.get("ui")?.toLowerCase()),
+    ui: ["true", "1"].includes(params.get("ui")?.toLowerCase()),
   });
   const detach = attachPlayerBridge(sketch);
   function leave(event) {
